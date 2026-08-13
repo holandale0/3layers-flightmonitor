@@ -1,0 +1,22 @@
+{
+  "name": "alerta_preco_voo",
+  "language": "pt_BR",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "✈️ Encontrei uma passagem dentro do preço que você definiu no seu monitor de voos.\n\nTrecho: {{1}}\nDatas da viagem: {{2}}\nDetalhes do voo: {{3}}\n\nPreço encontrado: {{4}}\nLimite que você configurou: {{5}}\n\nVocê está recebendo este aviso porque cadastrou este monitor de preços.",
+      "example": {
+        "body_text": [
+          [
+            "GRU para LIS",
+            "25/09/2026 a 08/10/2026",
+            "Air Europa, 1 escala",
+            "R$ 5.602,00",
+            "R$ 9.000,00"
+          ]
+        ]
+      }
+    }
+  ]
+}

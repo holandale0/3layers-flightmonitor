@@ -1,0 +1,29 @@
+# Runtime do worker. Instalar em venv:
+#   python -m venv .venv
+#   .venv/Scripts/python.exe -m pip install -r requirements.txt
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+pydantic==2.13.4
+pydantic-settings==2.15.0
+
+# httpx2, e nao httpx: o Starlette deprecou o httpx no TestClient e o
+# httpx2 e o sucessor. Manter as duas seria carregar dois clientes HTTP.
+httpx2==2.10.0
+
+# Camada 2 da coleta (E1.6): confirma o preco antes de alertar.
+#
+# Ficou COMENTADA da E1.6 ate a E4.2, e ninguem percebeu porque a venv local
+# tinha a biblioteca instalada a mao. So apareceu quando o worker subiu em
+# container: a camada 2 caiu, e o sistema — corretamente — se recusou a alertar
+# com preco nao confirmado. Ver BUG-014.
+fast-flights==3.0.2
+
+# Importado DIRETO pelo gateway da camada 2, para rodar a chamada bloqueante da
+# fast-flights numa thread sem prender o event loop. Ja vinha de carona pelo
+# FastAPI, e por isso nunca foi declarado — mas dependencia que se importa e
+# dependencia direta: no dia em que o Starlette trocar de biblioteca, o worker
+# quebra sem ninguem ter mexido nele. Achado pelo test_dependencias.py.
+anyio>=4.14
+# Mensageria, etapa E4.1. Async, para conviver com o event loop do FastAPI.
+aio-pika>=9.5

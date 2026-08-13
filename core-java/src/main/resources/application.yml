@@ -1,0 +1,221 @@
+spring:
+  application:
+    name: flight-monitor-core
+
+  # Reaproveita o .env da raiz do projeto — mesma fonte de credenciais usada pelo
+  # docker-compose. "optional:" evita quebrar quando o arquivo não existe (CI, container).
+  config:
+    import: optional:file:../.env[.properties]
+
+  datasource:
+    # Porta 5433: a 5432 é usada por um PostgreSQL nativo do Windows. Ver docs/PROGRESSO.md
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:flightmon}
+    username: ${POSTGRES_USER:flightmon}
+    password: ${POSTGRES_PASSWORD:flightmon}
+    hikari:
+      pool-name: flightmon-pool
+      maximum-pool-size: 10
+      connection-timeout: 10000
+
+  jpa:
+    # O Flyway é o dono do schema. O Hibernate apenas confere se bate com as entidades.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  jackson:
+    default-property-inclusion: non_null
+
+  web:
+    error:
+      # No Spring Boot 4 esta chave saiu de server.error para spring.web.error.
+      include-message: always
+
+  # Broker da etapa E4.1. So e usado quando o transporte e AMQP; com REST, a
+  # conexao nem chega a ser aberta.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:flightmon}
+    password: ${RABBITMQ_PASSWORD:flightmon}
+
+  # Canal de e-mail (E4.6). Vem do .env da raiz. Enquanto vazios, o canal EMAIL
+  # recusa envio com mensagem clara em vez de estourar excecao do JavaMail.
+  #
+  # A conta e a do SISTEMA, nunca a pessoal do usuario: remetente igual a
+  # destinatario faz o Gmail agrupar os alertas numa thread so e tratar a
+  # notificacao de forma diferente. Ver D-098 e docs/GUIA-EMAIL.md.
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          # STARTTLS na 587. Sem isto a senha de app viajaria em texto claro, e
+          # o Gmail recusa a conexao de qualquer forma.
+          starttls:
+            enable: true
+            required: true
+          # Sem timeout, um SMTP que nao responde prende a thread do despacho
+          # ate o sistema operacional desistir — minutos, no pior caso.
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
+flightmonitor:
+  worker:
+    # REST (padrao) ou AMQP. Os dois adaptadores implementam o mesmo contrato,
+    # com a mesma semantica sincrona — a troca e de transporte, nao de
+    # comportamento. Ver E4.1 e D-087.
+    transporte: ${WORKER_TRANSPORTE:REST}
+    base-url: ${WORKER_BASE_URL:http://localhost:8001}
+    connect-timeout: 3s
+    # A varredura consulta uma API cacheada e rapida; a confirmacao vai ao
+    # Google ao vivo. Timeouts iguais seriam curtos demais para a camada 2 ou
+    # longos demais para detectar a camada 1 travada.
+    scan-timeout: 30s
+    confirm-timeout: 60s
+
+  search:
+    # Quantos candidatos da camada 1 sao levados a camada 2 por varredura.
+    # Cada confirmacao e uma consulta ao vivo ao Google (~1s) sujeita a bloqueio
+    # por excesso de requisicoes. O alerta trata da melhor oportunidade, entao
+    # confirmar a mais barata basta.
+    max-confirmacoes: 1
+
+  scheduler:
+    enabled: ${SCHEDULER_ENABLED:true}
+    # De quanto em quanto tempo procuramos monitores vencidos. NAO e o intervalo
+    # entre varreduras de um monitor — esse fica em search_interval_minutes,
+    # por monitor.
+    poll-interval: PT1M
+    # Espera antes do primeiro ciclo: deixa a aplicacao terminar de subir.
+    initial-delay: PT30S
+    batch-size: 10
+    # Apos falha, o monitor volta a fila antes do intervalo normal, mas nao de
+    # imediato: martelar uma fonte com problema so piora.
+    retry-delay: PT15M
+
+  stats:
+    # Periodo de observacoes considerado nas estatisticas de rota (E2.1). Preco
+    # de seis meses atras nao descreve o mercado de hoje; janela curta demais
+    # nao acumula amostra para dizer o que e normal.
+    janela: P90D
+    # A partir de quantas observacoes o resultado vale como referencia. Abaixo
+    # disso os numeros saem marcados como nao confiaveis — a E2.2 nao deve
+    # disparar anomalia com base neles.
+    minimo-amostras: 8
+    # Regra de Tukey (E2.2): atipico e o preco abaixo de p25 - k * (p75 - p25).
+    # 1,5 e o valor classico, o mesmo dos bigodes de um boxplot.
+    fator-de-anomalia: 1.5
+
+  score:
+    # Pesos do Flight Score (E2.3). Nao existe peso certo: quanto uma escala
+    # vale em relacao a duzentos reais e preferencia pessoal. Ficam aqui para a
+    # opiniao ser visivel e ajustavel, em vez de escondida no codigo.
+    # O preco pesa mais de proposito — o sistema existe para achar passagem
+    # barata, e premiar conforto acima de preco contradiria o produto.
+    peso-preco: 50
+    peso-escalas: 20
+    peso-duracao: 20
+    peso-horario: 10
+    # Quanto do peso precisa estar disponivel para a nota ser confiavel. 0,5
+    # cobre preco + escalas, que e o que a camada 1 sozinha consegue oferecer.
+    cobertura-minima: 0.5
+
+  trend:
+    # Janela da serie temporal (E2.5). Mais curta que a das estatisticas de
+    # proposito: tendencia e sobre o movimento RECENTE, e 90 dias diluiriam uma
+    # queda que comecou na semana passada.
+    janela: P30D
+    # Dias DISTINTOS com observacao, nao observacoes: cem precos coletados no
+    # mesmo dia nao dizem nada sobre movimento no tempo.
+    minimo-de-dias: 3
+    dias-para-confiar: 7
+    # Abaixo disso chamamos de estavel. Sem limiar, oscilacao de centavos viraria
+    # "subindo" ou "caindo", e a informacao perderia o sentido por nunca parar.
+    limiar-percentual-semanal: 2.0
+
+  alert:
+    # Queda exigida para re-alertar sobre a MESMA combinacao de datas. Preco de
+    # passagem oscila varias vezes ao dia; sem isso, cada centavo a menos viraria
+    # mensagem e o usuario aprenderia a ignorar a notificacao.
+    queda-minima-percentual: 5
+    # Intervalo minimo entre dois alertas do mesmo monitor, mesmo para datas
+    # diferentes. Evita rajada quando varias datas caem abaixo do teto de uma vez.
+    cooldown: PT12H
+    # Alertar quando a camada 2 nao confirmou o preco? Padrao false: medimos
+    # divergencias de 61%, 69% e 81% entre o cache e o preco real. Ver D-041.
+    alertar-sem-confirmacao: false
+
+  notification:
+    # Canal ativo. LOG ate a etapa E1.12 trazer o WhatsApp — e permanece como
+    # valvula de escape se o WhatsApp cair: melhor alerta visivel no log do que
+    # pendencia acumulando em silencio.
+    canal: ${NOTIFICATION_CHANNEL:LOG}
+    # So conta falha TRANSITORIA. Falha permanente (numero invalido, mensagem
+    # recusada) vai direto a FAILED, sem gastar tentativa.
+    max-tentativas: 3
+    lote: 50
+    # Rede de seguranca: entrega imediata e o caminho normal, esta varredura
+    # cobre queda no meio do caminho e retentativa.
+    sweep-interval: PT2M
+    initial-delay: PT45S
+
+  whatsapp:
+    # Vem do .env da raiz. Enquanto vazios, o canal WHATSAPP recusa envio com
+    # mensagem clara em vez de falhar de forma obscura.
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+    # Template aprovado na Meta. Alerta e mensagem iniciada pela empresa, e
+    # essas exigem template. Ver docs/GUIA-WHATSAPP.md.
+    # O nome mudou de "alerta_passagem" para este: a Meta classificou o primeiro
+    # como MARKETING e nao permite recriar o MESMO nome com outra categoria.
+    # Esta linha ficou com o nome velho por dois dias — o template certo estava
+    # em WhatsAppProperties, mas o YAML tem precedencia sobre o default do record.
+    # Trocar o canal para WHATSAPP teria feito TODO alerta falhar com 132001.
+    template-name: ${WHATSAPP_TEMPLATE_NAME:alerta_preco_voo}
+    template-language: pt_BR
+    api-version: v21.0
+    # Segredo que voce inventa e informa a Meta ao cadastrar o webhook.
+    webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
+    # Segredo do app, para conferir a assinatura de cada notificacao recebida.
+    # Vazio = endpoint aceita qualquer POST. Aceitavel so em desenvolvimento.
+    app-secret: ${WHATSAPP_APP_SECRET:}
+    timeout: PT20S
+
+  email:
+    # Precisa ser a MESMA conta autenticada em spring.mail.username, ou um alias
+    # ja verificado em "Enviar e-mail como": qualquer outro endereco o Gmail
+    # reescreve ou recusa. Ver D-098.
+    remetente: ${MAIL_FROM:}
+    nome-exibido: ${MAIL_FROM_NAME:Monitor de Passagens}
+
+server:
+  port: ${SERVER_PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+logging:
+  level:
+    "[com.flightmonitor.core]": DEBUG

@@ -1,0 +1,15 @@
+# Normaliza fim de linha: LF no repositorio e no checkout.
+# Importante porque o projeto roda em container Linux — script com CRLF quebra.
+* text=auto eol=lf
+
+# Exceções que precisam de CRLF para funcionar no Windows
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binários — nunca converter
+*.png binary
+*.jpg binary
+*.ico binary
+*.jar binary
+*.zip binary

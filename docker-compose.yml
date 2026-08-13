@@ -1,0 +1,168 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: flightmon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flightmon}
+      POSTGRES_USER: ${POSTGRES_USER:-flightmon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flightmon}
+      # Evita que o locale do host influencie a ordenação de índices
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      # 5433 no host: a 5432 já é usada por um PostgreSQL nativo do Windows
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Cria o banco da suite de testes na primeira subida (E4.2, RISCO-008).
+      # So roda com volume novo — em instalacao existente, o banco foi criado a
+      # mao; o proprio script diz como.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flightmon} -d ${POSTGRES_DB:-flightmon}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ------------------------------------------------------------------ E4.1
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: flightmon-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-flightmon}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-flightmon}
+    ports:
+      # 5672 e o AMQP; 15672 e o painel de administracao, que vale ter no
+      # desenvolvimento — e por ele que se ve fila crescendo e mensagem parada
+      # na dead-letter sem precisar de codigo nenhum.
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ============================================================ os 3 servicos
+  # Etapa E4.2. Ate aqui o compose subia so a infraestrutura, e as aplicacoes
+  # rodavam na maquina — o que funcionava e escondia uma pergunta: "sobe numa
+  # maquina limpa?". Agora `docker compose up` responde.
+
+  core:
+    build:
+      context: ./core-java
+    container_name: flightmon-core
+    restart: unless-stopped
+    depends_on:
+      # `service_healthy` e nao `service_started`: container de pe nao quer
+      # dizer banco aceitando conexao. Sem isto o Flyway falha na largada, de
+      # forma intermitente, e o erro nao fala em ordem de subida.
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      # Dentro da rede do compose os servicos se acham pelo NOME, e a porta e a
+      # interna (5432), nao a publicada no host (5433).
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-flightmon}
+      POSTGRES_USER: ${POSTGRES_USER:-flightmon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flightmon}
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-flightmon}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-flightmon}
+
+      WORKER_BASE_URL: http://worker:8001
+      WORKER_TRANSPORTE: ${WORKER_TRANSPORTE:-REST}
+
+      # Credenciais vem do .env da raiz, que o compose le sozinho. Elas NAO
+      # entram na imagem: imagem e artefato compartilhavel, segredo nao.
+      NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-LOG}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_WABA_ID: ${WHATSAPP_WABA_ID:-}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Monitor de Passagens}
+    ports:
+      - "${CORE_PORT:-8081}:8081"
+    healthcheck:
+      # `readiness` e nao `health`: o health geral fica DOWN quando o worker
+      # esta fora, e o core continua util nesse estado — ele so nao varre. Um
+      # container reiniciando por causa da saude do vizinho seria pior.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  worker:
+    build:
+      context: ./worker-python
+    container_name: flightmon-worker
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      TRAVELPAYOUTS_TOKEN: ${TRAVELPAYOUTS_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-flightmon}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-flightmon}
+      WORKER_TRANSPORTE: ${WORKER_TRANSPORTE:-REST}
+    ports:
+      # Publicado so para depurar. O navegador nao fala com o worker — quem fala
+      # e o core, pela rede interna (regra 1 da secao 3 do PLANO-DE-ACAO).
+      - "${WORKER_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  painel:
+    build:
+      context: ./frontend-vue
+    container_name: flightmon-painel
+    restart: unless-stopped
+    depends_on:
+      # Sem esperar `healthy`: o nginx sobe e serve o painel mesmo com o core
+      # fora, e a tela mostra o erro da API — que e melhor do que nao abrir.
+      - core
+    ports:
+      # 8090 e nao 8080: a 8080 e disputada por todo tipo de ferramenta, e nesta
+      # maquina ja estava tomada por um servico do Windows. Mesmo motivo da
+      # 5433 no PostgreSQL — porta padrao ocupada e o normal, nao a excecao.
+      - "${PAINEL_PORT:-8090}:80"
+    healthcheck:
+      # 127.0.0.1 e nao localhost: o wget do BusyBox tenta ::1 primeiro,
+      # e o nginx escuta em IPv4 — dava "connection refused" com o
+      # servidor funcionando perfeitamente.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres-data:
+    name: flightmon-postgres-data
+  rabbitmq-data:
+    name: flightmon-rabbitmq-data

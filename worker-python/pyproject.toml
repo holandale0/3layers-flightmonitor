@@ -1,0 +1,17 @@
+[project]
+name = "flight-monitor-worker"
+version = "0.1.0"
+description = "Worker de busca e análise de preços de passagens aéreas"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
