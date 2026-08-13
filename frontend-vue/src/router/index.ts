@@ -3,8 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import MonitoresView from '@/views/MonitoresView.vue'
 
 /**
- * A rota de historico ja existe aqui, mas a tela chega na etapa E1.14.
- * Ate la, o link do cartao leva a um placeholder honesto em vez de 404.
+ * Carregamento sob demanda em tudo menos a tela inicial: `MonitoresView` e o
+ * destino do `/`, entao adiar o carregamento dela so adicionaria um salto.
  */
 const router = createRouter({
   history: createWebHistory(),
@@ -16,6 +16,11 @@ const router = createRouter({
       name: 'historico',
       component: () => import('@/views/HistoricoView.vue'),
       props: true,
+    },
+    {
+      path: '/destinatarios',
+      name: 'destinatarios',
+      component: () => import('@/views/DestinatariosView.vue'),
     },
     { path: '/status', name: 'status', component: () => import('@/views/StatusView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/monitores' },

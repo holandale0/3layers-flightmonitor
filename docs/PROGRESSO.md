@@ -77,6 +77,8 @@
 | Item | Status |
 |---|---|
 | Arquitetura BCE nos três módulos, verificada por teste | ✅ concluída |
+| Limpeza de dados pessoais + repositório recomeçado | ✅ concluída |
+| Painel: cadastro de destinatários | ✅ concluída |
 
 **Legenda:** ⬜ pendente · 🟡 em andamento · ✅ concluída · 🔴 bloqueada · 📋 decidida, não implementada
 
@@ -2975,3 +2977,55 @@ o build. O lugar deles é no `mvn test`, com os serviços de pé.
 **Placar:** core-java **375**, worker-python **95**, frontend-vue **24**.
 
 **Próximo passo:** E4.3 — observabilidade.
+
+---
+
+### 2026-08-13 — ✅ Painel de destinatários · E o Actuator ganhou o canal ativo
+
+Faltava a tela mais básica que existe: **cadastrar quem recebe o alerta**. A API existia desde a
+E1.4, mas o painel só *listava* — criar destinatário exigia `curl`. Num projeto que vai virar
+público, isso é a primeira parede que alguém encontra.
+
+Tela com CRUD completo, formulário com telefone **e** e-mail, e a regra "pelo menos um" repetida
+no navegador — para **avisar**, não para garantir: a API recusa de qualquer jeito, com o CHECK do
+banco por trás.
+
+#### A tela pediu um indicador que não existia
+
+Queria que ela avisasse quem **não vai ser alcançado**: um destinatário só com e-mail, com o
+sistema em `WHATSAPP`, é um alerta que falha em silêncio — vira falha permanente, e a pessoa nunca
+sabe que perdeu a passagem.
+
+Escrevi a tela lendo `components.notificacao.canal` do Actuator. **Esse indicador não existia.** Do
+jeito que estava, o aviso simplesmente nunca apareceria, e ninguém perceberia — um recurso que é um
+no-op silencioso é pior que recurso ausente, porque parece que está lá.
+
+Nasceu o `NotificacaoHealthIndicator`, e ele acabou útil além da tela:
+
+```json
+"notificacao": {
+  "status": "UP",
+  "details": {
+    "canal": "EMAIL",
+    "disponiveis": ["EMAIL", "LOG", "WHATSAPP"],
+    "confirmacaoAssincrona": false
+  }
+}
+```
+
+O `confirmacaoAssincrona` explica no painel por que um alerta para em `ACCEPTED` (WhatsApp, espera
+webhook) e outro em `SENT` (e-mail, o SMTP aceitou e acabou).
+
+**`LOG` é `UP`, e não doença.** É o padrão de quem acabou de clonar o projeto; marcar como `DOWN`
+faria o `/health` mentir para quem está só experimentando. O que **derruba** o status é canal
+configurado sem implementação — aí sim o sistema acha que vai avisar por um caminho que não existe.
+
+#### Verificado em container, com os três casos
+
+| Caso | Resultado |
+|---|---|
+| Só e-mail, sem telefone | `201` — era impossível antes da E4.6 |
+| Só telefone, com espaços e parênteses | `201`, normalizado para `+5511988887777` |
+| Sem telefone e sem e-mail | `400`, com a mensagem **no campo** |
+
+**Placar:** core-java **379**, worker-python **95**, frontend-vue **32**.

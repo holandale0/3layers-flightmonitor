@@ -8,6 +8,7 @@ import { RouterLink, RouterView } from 'vue-router'
       <span class="marca">✈️ Flight Monitor</span>
       <nav>
         <RouterLink to="/monitores">Monitores</RouterLink>
+        <RouterLink to="/destinatarios">Destinatários</RouterLink>
         <RouterLink to="/status">Status</RouterLink>
       </nav>
     </header>
