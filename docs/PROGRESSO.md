@@ -3029,3 +3029,56 @@ configurado sem implementação — aí sim o sistema acha que vai avisar por um
 | Sem telefone e sem e-mail | `400`, com a mensagem **no campo** |
 
 **Placar:** core-java **379**, worker-python **95**, frontend-vue **32**.
+
+---
+
+### 2026-08-13 — 📖 README verificado, e não só escrito
+
+O repositório vai a público, e o README era da Fase 0: prometia WhatsApp como único canal, mandava
+subir só o banco por Docker, e listava um roadmap onde três fases já concluídas apareciam como
+futuro.
+
+Reescrito — e, principalmente, **verificado**. A frase "clone e rode em dois minutos" é a primeira
+coisa que um visitante testa; publicá-la sem executar seria escrever ficção.
+
+#### Verificar custou três tentativas, e as duas primeiras foram culpa minha
+
+**1.** Simulei o clone limpo com `--env-file .env.example`, e o core não subiu:
+`password authentication failed`. Não era bug do projeto — o volume do Postgres já existia com a
+senha do meu `.env`, e o exemplo traz `trocar-esta-senha`.
+
+**2.** Tentei isolar com `docker compose -p flightmon-limpo`. **Também não isolou:** os volumes têm
+`name:` fixo no compose, e nome explícito é compartilhado entre projetos. O `-p` deu a impressão de
+isolamento sem entregar nenhum.
+
+**3.** Só com um override renomeando os volumes o teste virou teste. Aí sim: cinco containers
+saudáveis, canal `LOG`, painel respondendo, CRUD funcionando — **sem nenhuma credencial**.
+
+#### O que a verificação corrigiu no texto
+
+Eu havia escrito que dava para "disparar uma varredura e ver a decisão de alerta acontecer" sem
+credencial. **Não dava:** sem `TRAVELPAYOUTS_TOKEN` a busca falha — corretamente, com
+`503` e a razão explícita, em vez de fingir "nenhuma oferta".
+
+A saída existe e é melhor: `USE_FAKE_PROVIDERS=true` troca as duas camadas por fontes
+deterministas, e aí o caminho **inteiro** roda sem cadastro em lugar nenhum. Repassei a variável no
+compose, mantendo-a fora do `.env.example` pelo motivo já documentado — um `true` esquecido ali
+faria o sistema inventar preços em silêncio.
+
+#### 🐛 E o teste achou um defeito bem na primeira tela
+
+O canal LOG imprimia:
+
+```
+│ para: null
+```
+
+Ele só lia `getPhoneE164()`, e desde a E4.6 o telefone é opcional. Um destinatário só com e-mail
+virava `null` — na exata saída que alguém vê ao rodar o projeto pela primeira vez. Agora imprime
+`Teste <teste@exemplo.com>`.
+
+Pequeno, e ilustrativo: a E4.6 tornou o telefone opcional e atualizou o WhatsApp, o e-mail, a
+entidade, os DTOs e o frontend. O canal de **desenvolvimento** passou batido, porque ninguém olha
+para ele — exceto quem está chegando.
+
+**Placar:** core-java **379**, worker-python **95**, frontend-vue **32**.

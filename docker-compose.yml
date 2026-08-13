@@ -126,6 +126,15 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-flightmon}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-flightmon}
       WORKER_TRANSPORTE: ${WORKER_TRANSPORTE:-REST}
+
+      # Modo de demonstracao: troca as duas camadas de coleta por fontes falsas
+      # e deterministas, para conhecer o sistema sem token nenhum.
+      #
+      # Repassado, mas AUSENTE do .env.example de proposito: um `true` esquecido
+      # ali faria o sistema inventar precos em silencio, e preco inventado que
+      # chega como alerta e pior que alerta nenhum. Quem liga isto, liga na linha
+      # de comando e sabe que ligou.
+      USE_FAKE_PROVIDERS: ${USE_FAKE_PROVIDERS:-false}
     ports:
       # Publicado so para depurar. O navegador nao fala com o worker — quem fala
       # e o core, pela rede interna (regra 1 da secao 3 do PLANO-DE-ACAO).

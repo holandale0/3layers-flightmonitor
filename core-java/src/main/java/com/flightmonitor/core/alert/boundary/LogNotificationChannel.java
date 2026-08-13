@@ -1,6 +1,7 @@
 package com.flightmonitor.core.alert.boundary;
 
 import com.flightmonitor.core.alert.entity.AlertChannel;
+import com.flightmonitor.core.recipient.entity.Recipient;
 import com.flightmonitor.core.alert.entity.Alert;
 import com.flightmonitor.core.alert.control.NotificationChannel;
 import com.flightmonitor.core.alert.control.DeliveryResult;
@@ -35,11 +36,29 @@ public class LogNotificationChannel implements NotificationChannel {
         return AlertChannel.LOG;
     }
 
+    /**
+     * Quem recebeu, para quem le o console.
+     *
+     * <p>Le telefone <b>ou</b> e-mail: desde a E4.6 o telefone e opcional, e a
+     * primeira versao disto imprimia {@code para: null} para quem so tem
+     * e-mail — bem na tela que alguem ve ao rodar o projeto pela primeira vez.
+     */
+    private static String descrever(Recipient destinatario) {
+        if (destinatario == null) {
+            return "(sem destinatario)";
+        }
+        String contato = destinatario.getPhoneE164() != null
+                ? destinatario.getPhoneE164()
+                : destinatario.getEmail();
+
+        return contato != null
+                ? "%s <%s>".formatted(destinatario.getName(), contato)
+                : destinatario.getName();
+    }
+
     @Override
     public DeliveryResult enviar(Alert alerta) {
-        String destino = alerta.getRecipient() != null
-                ? alerta.getRecipient().getPhoneE164()
-                : "(sem destinatario)";
+        String destino = descrever(alerta.getRecipient());
 
         // A mensagem tem acento e emoji de proposito — e o texto que iria para o
         // WhatsApp. Impressa via println e nao pelo logger: o console do Windows
