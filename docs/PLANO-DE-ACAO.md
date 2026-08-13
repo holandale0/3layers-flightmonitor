@@ -304,6 +304,7 @@ marcada como concluída em [PROGRESSO.md](PROGRESSO.md).
 | **E4.3** | Observabilidade | Logs estruturados, métricas de busca, taxa de falha por provider |
 | **E4.4** | Deploy | Ambiente rodando de forma contínua |
 | **E4.5** | **Canário ao vivo** das fontes externas | Rotina agendada consulta as APIs reais e avisa quando o formato mudar |
+| **E4.7** | **Configuração do canal por tela** | ✅ `phone_number_id`, `waba_id`, template e idioma no banco, editáveis sem reiniciar. Segredos seguem no ambiente. [D-100](DECISOES.md) |
 | **E4.6** | **Canal de e-mail** | ✅ terceira implementação de `NotificationChannel`, escolhida por `NOTIFICATION_CHANNEL=EMAIL`. Migration V7 aditiva, WhatsApp intocado. Testado contra SMTP falso, sem mandar e-mail de verdade. [D-097](DECISOES.md) · [D-098](DECISOES.md) · [GUIA-EMAIL.md](GUIA-EMAIL.md) |
 
 > **Sobre a E4.6 e o escopo original.** A seção 2 diz "sem e-mail", e isso era uma decisão

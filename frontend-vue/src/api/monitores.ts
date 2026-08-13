@@ -34,3 +34,4 @@ export function excluirMonitor(id: number): Promise<void> {
 export function varrerAgora(id: number): Promise<MonitorRunResult> {
   return postJson<MonitorRunResult>(`/monitors/${id}/search`, {})
 }
+

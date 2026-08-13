@@ -71,7 +71,8 @@
 | E4.3 | Observabilidade | ⬜ pendente |
 | E4.4 | Deploy | ⬜ pendente |
 | E4.5 | **Canário ao vivo** das fontes | ⬜ pendente |
-| E4.6 | **Canal de e-mail** | ✅ concluída (falta só a senha de app para o envio real) |
+| E4.6 | **Canal de e-mail** | ✅ concluída |
+| E4.7 | **Configuração do canal por tela** | ✅ concluída |
 
 ### Fora do roteiro
 | Item | Status |
@@ -3082,3 +3083,64 @@ entidade, os DTOs e o frontend. O canal de **desenvolvimento** passou batido, po
 para ele — exceto quem está chegando.
 
 **Placar:** core-java **379**, worker-python **95**, frontend-vue **32**.
+
+---
+
+### 2026-08-13 — ✅ E4.7 concluída · A configuração saiu do arquivo
+
+Quem clona o projeto precisava editar o `.env` e **reiniciar** para apontar o sistema para o
+próprio número e template. Agora aponta por tela, em `/configuracao`.
+
+#### A divisão, que é a decisão inteira
+
+| Vai para o banco | Fica no ambiente |
+|---|---|
+| `phone_number_id`, `waba_id` | `WHATSAPP_ACCESS_TOKEN` |
+| `template_name`, `template_language` | `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` |
+
+**O que identifica vai; o que autentica fica** ([D-100](DECISOES.md)). Levar tudo pareceria mais
+completo e custaria três coisas: segredo em coluna de texto acaba em `pg_dump` e em backup; tela
+que grava credencial torna **autenticação obrigatória** num projeto que decidiu não ter login; e o
+`GET` deixaria de poder existir sem medo.
+
+Com a metade escolhida, o `GET` devolve `tokenConfigurado` como booleano e **nunca o valor** — há
+teste garantindo isso, e ele é o mais importante do conjunto.
+
+#### O dilema de camada, de novo
+
+O resolvedor precisa de `WhatsAppProperties` (borda) e do repositório (entidade). Colocá-lo no
+controle faria o controle depender da borda — e faria o motor saber que WhatsApp existe, que é
+justamente a regra 3 da seção 3 do plano.
+
+A divisão que as regras já permitiam: **o controle persiste, a borda resolve, e o controller
+compõe** — ele é o único ponto que pode falar com os dois lados. O ArchUnit aprovou sem exceção
+nova.
+
+#### A prova de que funciona sem reiniciar
+
+Não bastava o `GET` refletir a mudança. Salvei um template **inexistente** pela API, com o
+processo no ar, e disparei um alerta real:
+
+```
+alerta 1968 · WHATSAPP · FAILED
+HTTP 404, codigo 132001: template nao encontrado para ESTE numero
+```
+
+O adaptador usou o valor **do banco** — se tivesse usado o `.env`, teria enviado com
+`alerta_preco_voo` e funcionado. Depois, `DELETE` devolveu tudo ao ambiente:
+`origem: AMBIENTE, pronto: true`.
+
+#### Um teste meu que era tarefa, e virou regra
+
+O `estrutura.spec.ts` comparava os módulos de `api/` com uma **lista fixa** — e reprovou na adição
+legítima do `configuracao.ts`, sem detectar defeito nenhum. Reescrito: agora ele olha os
+**caminhos** que cada módulo usa e reprova quando um arquivo trata de dois recursos, que é o
+defeito original (`monitores.ts` com monitores, destinatários *e* observações).
+
+Verifiquei que pega: recolocando `listarDestinatarios` no `monitores.ts`, ele reprova. A primeira
+versão do regex também pegava caminhos citados em **comentário** — reprovava o `saude.ts` por causa
+da própria explicação dele.
+
+**Placar:** core-java **393**, worker-python **95**, frontend-vue **36**.
+
+**Próximo passo:** E4.3 — observabilidade.

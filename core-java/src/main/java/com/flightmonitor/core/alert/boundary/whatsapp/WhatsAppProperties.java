@@ -48,12 +48,26 @@ public record WhatsAppProperties(
         timeout = timeout == null ? Duration.ofSeconds(20) : timeout;
     }
 
-    public boolean configurado() {
-        return !vazio(phoneNumberId) && !vazio(accessToken);
+    /**
+     * Ha token no ambiente?
+     *
+     * <p>Separado de "esta configurado" desde a E4.7: o <b>numero</b> pode vir do
+     * banco, mas o <b>token</b> so vem daqui. Juntar as duas perguntas fazia o
+     * canal recusar envio por falta de numero no ambiente mesmo quando havia
+     * numero salvo na tela.
+     */
+    public boolean temToken() {
+        return !vazio(accessToken);
     }
 
-    /** Endereco de envio: {baseUrl}/{versao}/{phoneNumberId}/messages */
-    public String enderecoDeEnvio() {
+    /**
+     * Endereco de envio: {baseUrl}/{versao}/{phoneNumberId}/messages
+     *
+     * <p>Recebe o identificador em vez de ler o proprio campo: desde a E4.7 quem
+     * decide o numero e {@code ConfiguracaoDoWhatsApp}, que consulta o banco
+     * antes do ambiente.
+     */
+    public String enderecoDeEnvio(String phoneNumberId) {
         return "%s/%s/%s/messages".formatted(baseUrl, apiVersion, phoneNumberId);
     }
 

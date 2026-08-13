@@ -95,8 +95,13 @@ export function putJson<T>(path: string, corpo: unknown): Promise<T> {
   })
 }
 
-export function del(path: string): Promise<void> {
-  return pedir<void>(`${BASE_URL}${path}`, { method: 'DELETE' })
+/**
+ * DELETE. Generico porque nem todo DELETE devolve 204: o de configuracao
+ * responde com o estado que passou a valer, que e o que a tela precisa mostrar.
+ * O padrao `void` mantem os usos que so apagam sem ler nada.
+ */
+export function del<T = void>(path: string): Promise<T> {
+  return pedir<T>(`${BASE_URL}${path}`, { method: 'DELETE' })
 }
 
 /** Endpoints do Actuator, que ficam na raiz e nao sob /api. */

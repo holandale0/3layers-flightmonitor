@@ -108,18 +108,30 @@ describe('estrutura do frontend', () => {
   })
 
   it('cada modulo de api trata de um recurso so', () => {
-    // `monitores.ts` ja tinha juntado monitores, destinatarios e observacoes.
+    // `monitores.ts` ja tinha juntado monitores, destinatarios E observacoes.
     // Um arquivo por recurso mantem o proximo endpoint barato de achar.
-    const modulos = readdirSync(join(SRC, 'api'))
-      .filter((n) => n.endsWith('.ts') && !n.endsWith('.spec.ts'))
-      .sort()
+    //
+    // A primeira versao deste teste comparava a lista de arquivos com uma lista
+    // fixa — e reprovava em toda adicao legitima, sem detectar defeito nenhum.
+    // Era tarefa, e nao regra. Agora ele olha os CAMINHOS que cada modulo usa:
+    // dois recursos diferentes no mesmo arquivo e exatamente o defeito original.
+    const porModulo = readdirSync(join(SRC, 'api'))
+      .filter((n) => n.endsWith('.ts') && !n.endsWith('.spec.ts') && n !== 'http.ts')
+      .map((nome) => {
+        // Sem os comentarios: a documentacao destes modulos cita caminhos
+        // ("fica fora de /api de proposito") e eles nao sao chamadas. A primeira
+        // versao reprovou o `saude.ts` por causa da propria explicacao dele.
+        const texto = readFileSync(join(SRC, 'api', nome), 'utf-8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\/\/.*$/gm, '')
 
-    expect(modulos).toEqual([
-      'destinatarios.ts',
-      'http.ts',
-      'monitores.ts',
-      'observacoes.ts',
-      'saude.ts',
-    ])
+        const raizes = new Set(
+          [...texto.matchAll(/['"`]\/([a-z-]+)/g)].map((m) => m[1]),
+        )
+        return { nome, raizes: [...raizes].sort() }
+      })
+      .filter((m) => m.raizes.length > 1)
+
+    expect(porModulo).toEqual([])
   })
 })

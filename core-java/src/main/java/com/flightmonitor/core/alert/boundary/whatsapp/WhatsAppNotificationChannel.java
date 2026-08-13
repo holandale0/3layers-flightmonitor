@@ -38,13 +38,18 @@ public class WhatsAppNotificationChannel implements NotificationChannel {
     private static final Logger log = LoggerFactory.getLogger(WhatsAppNotificationChannel.class);
 
     private final WhatsAppProperties props;
+    private final ConfiguracaoDoWhatsApp configuracao;
     private final AlertMessageFormatter formatador;
     private final ObjectMapper json;
     private final RestClient client;
 
     public WhatsAppNotificationChannel(
-            WhatsAppProperties props, AlertMessageFormatter formatador, ObjectMapper json) {
+            WhatsAppProperties props,
+            ConfiguracaoDoWhatsApp configuracao,
+            AlertMessageFormatter formatador,
+            ObjectMapper json) {
         this.props = props;
+        this.configuracao = configuracao;
         this.formatador = formatador;
         this.json = json;
 
@@ -61,9 +66,10 @@ public class WhatsAppNotificationChannel implements NotificationChannel {
 
         this.client = RestClient.builder().requestFactory(factory).build();
 
-        if (!props.configurado()) {
-            log.warn("WhatsApp sem credenciais: defina WHATSAPP_PHONE_NUMBER_ID e "
-                    + "WHATSAPP_ACCESS_TOKEN no .env antes de ativar este canal");
+        if (!props.temToken()) {
+            log.warn("WhatsApp sem token: defina WHATSAPP_ACCESS_TOKEN no .env antes de "
+                    + "ativar este canal. O numero e o template podem vir da tela (E4.7), "
+                    + "mas o token nunca — segredo nao mora em banco");
         }
     }
 
@@ -86,9 +92,18 @@ public class WhatsAppNotificationChannel implements NotificationChannel {
 
     @Override
     public DeliveryResult enviar(Alert alerta) {
-        if (!props.configurado()) {
+        // Lida AQUI, e nao no construtor: e o que permite trocar template ou
+        // numero pela tela sem reiniciar (E4.7).
+        ConfiguracaoDoWhatsApp.Efetiva efetiva = configuracao.atual();
+
+        if (!props.temToken()) {
             return DeliveryResult.falhaPermanente(
-                    "WhatsApp sem credenciais configuradas: veja docs/GUIA-WHATSAPP.md");
+                    "WhatsApp sem WHATSAPP_ACCESS_TOKEN no ambiente: veja docs/GUIA-WHATSAPP.md");
+        }
+        if (!efetiva.identificada()) {
+            return DeliveryResult.falhaPermanente(
+                    "WhatsApp sem numero remetente: configure em /configuracao ou "
+                            + "defina WHATSAPP_PHONE_NUMBER_ID no .env");
         }
         if (alerta.getRecipient() == null) {
             return DeliveryResult.falhaPermanente("alerta sem destinatario");
@@ -111,10 +126,10 @@ public class WhatsAppNotificationChannel implements NotificationChannel {
 
         try {
             String corpo = client.post()
-                    .uri(props.enderecoDeEnvio())
+                    .uri(props.enderecoDeEnvio(efetiva.phoneNumberId()))
                     .header("Authorization", "Bearer " + props.accessToken())
                     .header("Content-Type", "application/json")
-                    .body(montarPayload(alerta, parametros))
+                    .body(montarPayload(alerta, parametros, efetiva))
                     .retrieve()
                     .body(String.class);
 
@@ -133,7 +148,8 @@ public class WhatsAppNotificationChannel implements NotificationChannel {
      *
      * <p>O telefone vai <b>sem</b> o "+" do E.164: a Graph API espera so digitos.
      */
-    private Map<String, Object> montarPayload(Alert alerta, List<String> parametros) {
+    private Map<String, Object> montarPayload(
+            Alert alerta, List<String> parametros, ConfiguracaoDoWhatsApp.Efetiva efetiva) {
         List<Map<String, String>> componentes = parametros.stream()
                 .map(valor -> Map.of("type", "text", "text", valor))
                 .toList();
@@ -144,8 +160,8 @@ public class WhatsAppNotificationChannel implements NotificationChannel {
                 "to", alerta.getRecipient().getPhoneE164().replace("+", ""),
                 "type", "template",
                 "template", Map.of(
-                        "name", props.templateName(),
-                        "language", Map.of("code", props.templateLanguage()),
+                        "name", efetiva.templateName(),
+                        "language", Map.of("code", efetiva.templateLanguage()),
                         "components", List.of(Map.of(
                                 "type", "body",
                                 "parameters", componentes))));

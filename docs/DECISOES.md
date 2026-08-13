@@ -1533,6 +1533,41 @@ legível.
 **O que isto NÃO resolve:** identidade sai do repositório, mas quem clonar ainda precisa das
 próprias credenciais. Essa é a [D-100](DECISOES.md).
 
+### D-100 · Vai para o banco o que identifica; fica no ambiente o que autentica ✅
+**Decisão:** `phone_number_id`, `waba_id`, `template_name` e `template_language` moram em
+`whatsapp_config` e são editáveis por tela. `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET` e
+`WHATSAPP_WEBHOOK_VERIFY_TOKEN` continuam **exclusivamente** no ambiente.
+
+**Por quê:** a pergunta veio de querer publicar o projeto — quem clonar precisa apontar para as
+próprias credenciais sem editar arquivo e reiniciar. Mas levar *tudo* para o banco tem três custos
+que a metade escolhida não tem:
+
+1. **Segredo em coluna de texto** vai parar em `pg_dump`, em backup e em qualquer log que serialize
+   a entidade. Evitar isso exigiria cifra — cuja chave viria do ambiente. Trocaríamos cinco
+   segredos no `.env` por um, e ganharíamos um mecanismo de cifra para manter.
+2. **Tela que grava credencial torna autenticação obrigatória.** Sem login (decisão de escopo da
+   seção 2), qualquer um que alcance o painel poderia ler a configuração, trocá-la, ou mandar
+   mensagem na conta do dono — **gastando o dinheiro dele**. Com só o não-secreto, o pior caso é
+   alguém apontar o sistema para outro template, e nada é enviado sem o token que ele não tem.
+3. **O `GET` pode existir sem medo.** Ele devolve `tokenConfigurado: true|false`, e nunca o valor.
+   Endpoint que devolve segredo transforma toda leitura em vazamento.
+
+**Banco primeiro, ambiente depois — e campo a campo.** Quem configurou pela tela espera que a tela
+mande. Campo em branco devolve *aquele* valor ao `.env`, e não a configuração inteira: o caso real
+é querer trocar só o template, sem redigitar um identificador que ninguém sabe de cor.
+
+**O fallback não é cortesia, é compatibilidade.** Toda instalação anterior a esta etapa tem os
+valores no `.env` e nenhuma linha no banco. Sem ele, a E4.7 quebraria o WhatsApp de quem já o
+tinha funcionando — preço alto demais por uma tela.
+
+**Lido a cada envio, e não no construtor.** Era esse o incômodo: trocar de template exigia
+reiniciar. O custo é uma consulta por chave primária por alerta — e alerta é evento raro, não laço
+quente. Cache aqui economizaria microssegundos e traria de volta exatamente o problema que a etapa
+veio resolver, disfarçado de otimização.
+
+**Uma linha, e só uma** (`CHECK (id = 1)`). O sistema é pessoal e fala por um número só; várias
+linhas criariam a pergunta "qual vale?", que não tem resposta boa.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.Optional;
 import java.time.LocalDate;
 
 import org.junit.jupiter.api.AfterAll;
@@ -17,11 +18,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import com.flightmonitor.core.alert.entity.Alert;
 import com.flightmonitor.core.alert.entity.AlertChannel;
 import com.flightmonitor.core.alert.control.AlertMessageFormatter;
 import com.flightmonitor.core.alert.control.DeliveryResult;
+import com.flightmonitor.core.alert.entity.WhatsAppConfigRepository;
 import com.flightmonitor.core.monitor.entity.Monitor;
 import com.flightmonitor.core.recipient.entity.Recipient;
 import com.flightmonitor.core.search.entity.PriceObservation;
@@ -64,7 +67,21 @@ class WhatsAppChannelTest {
                 null,
                 Duration.ofSeconds(2));
 
-        canal = new WhatsAppNotificationChannel(props, new AlertMessageFormatter(), new ObjectMapper());
+        canal = new WhatsAppNotificationChannel(
+                props, soDoAmbiente(props), new AlertMessageFormatter(), new ObjectMapper());
+    }
+
+    /**
+     * Configuracao com o banco VAZIO — o caso de quem nunca abriu a tela.
+     *
+     * <p>E o cenario que este teste sempre exercitou, e continua exercitando
+     * depois da E4.7: os valores vem do ambiente. A E4.7 acrescentou uma fonte
+     * com precedencia, e nao trocou esta.
+     */
+    private static ConfiguracaoDoWhatsApp soDoAmbiente(WhatsAppProperties props) {
+        WhatsAppConfigRepository bancoVazio = Mockito.mock(WhatsAppConfigRepository.class);
+        Mockito.when(bancoVazio.carregar()).thenReturn(Optional.empty());
+        return new ConfiguracaoDoWhatsApp(bancoVazio, props);
     }
 
     @AfterAll
@@ -325,8 +342,8 @@ class WhatsAppChannelTest {
         WhatsAppProperties vazio = new WhatsAppProperties(
                 null, null, "http://localhost:1", "v21.0", "alerta_preco_voo", "pt_BR",
                 null, null, Duration.ofSeconds(1));
-        WhatsAppNotificationChannel semCred =
-                new WhatsAppNotificationChannel(vazio, new AlertMessageFormatter(), new ObjectMapper());
+        WhatsAppNotificationChannel semCred = new WhatsAppNotificationChannel(
+                vazio, soDoAmbiente(vazio), new AlertMessageFormatter(), new ObjectMapper());
 
         DeliveryResult r = semCred.enviar(alerta());
 

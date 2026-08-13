@@ -22,6 +22,11 @@ const router = createRouter({
       name: 'destinatarios',
       component: () => import('@/views/DestinatariosView.vue'),
     },
+    {
+      path: '/configuracao',
+      name: 'configuracao',
+      component: () => import('@/views/ConfiguracaoView.vue'),
+    },
     { path: '/status', name: 'status', component: () => import('@/views/StatusView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/monitores' },
   ],
