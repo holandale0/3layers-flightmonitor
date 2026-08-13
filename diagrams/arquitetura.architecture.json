@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Flight Monitor — arquitetura dos serviços",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "navegador",
+      "type": "external",
+      "label": "Navegador",
+      "sublabel": "quem configura",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "painel",
+      "type": "frontend",
+      "label": "frontend-vue",
+      "sublabel": "Vue 3 · nginx :8090",
+      "pos": [
+        230,
+        250
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "core-java",
+      "sublabel": "Spring Boot :8081",
+      "pos": [
+        440,
+        250
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "banco",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "só o core acessa",
+      "pos": [
+        440,
+        430
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "fila",
+      "type": "messagebus",
+      "label": "RabbitMQ",
+      "sublabel": "transporte alternativo",
+      "pos": [
+        650,
+        400
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "worker-python",
+      "sublabel": "FastAPI :8001",
+      "pos": [
+        860,
+        250
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "travelpayouts",
+      "type": "external",
+      "label": "Travelpayouts",
+      "sublabel": "camada 1 · varredura",
+      "pos": [
+        1080,
+        160
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "googleflights",
+      "type": "external",
+      "label": "Google Flights",
+      "sublabel": "camada 2 · confirmação",
+      "pos": [
+        1080,
+        340
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "meta",
+      "type": "external",
+      "label": "WhatsApp Cloud API",
+      "sublabel": "canal de alerta",
+      "pos": [
+        230,
+        90
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "SMTP",
+      "sublabel": "canal de alerta",
+      "pos": [
+        440,
+        90
+      ],
+      "size": [
+        140,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "docker compose",
+      "wraps": [
+        "painel",
+        "core",
+        "banco",
+        "fila",
+        "worker"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "o Java é o dono do banco",
+      "wraps": [
+        "core",
+        "banco"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "uso",
+      "from": "navegador",
+      "to": "painel",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "proxy",
+      "from": "painel",
+      "to": "core",
+      "label": "/api"
+    },
+    {
+      "id": "persistencia",
+      "from": "core",
+      "to": "banco",
+      "label": "JPA + Flyway",
+      "labelDy": 24
+    },
+    {
+      "id": "busca-rest",
+      "from": "core",
+      "to": "worker",
+      "label": "REST · padrão",
+      "variant": "emphasis"
+    },
+    {
+      "id": "busca-amqp",
+      "from": "core",
+      "to": "fila",
+      "label": "AMQP · alternativo",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "consumo",
+      "from": "fila",
+      "to": "worker",
+      "variant": "dashed"
+    },
+    {
+      "id": "camada1",
+      "from": "worker",
+      "to": "travelpayouts",
+      "label": "mês inteiro"
+    },
+    {
+      "id": "camada2",
+      "from": "worker",
+      "to": "googleflights",
+      "label": "confirma o candidato"
+    },
+    {
+      "id": "whatsapp",
+      "from": "core",
+      "to": "meta",
+      "label": "template aprovado",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "email",
+      "from": "core",
+      "to": "smtp",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ]
+}

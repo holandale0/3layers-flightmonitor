@@ -3144,3 +3144,53 @@ da própria explicação dele.
 **Placar:** core-java **393**, worker-python **95**, frontend-vue **36**.
 
 **Próximo passo:** E4.3 — observabilidade.
+
+---
+
+### 2026-08-13 — 📐 Diagramas do sistema, com archify
+
+Quatro diagramas em [diagrams/](../diagrams/), um de cada tipo que a ferramenta oferece e que
+faz sentido aqui: **arquitetura** (quem fala com quem), **sequência** (da varredura ao alerta),
+**ciclo de vida** (o que o sistema sabe sobre a entrega) e **fluxo de dados** (como o histórico
+vira nota e anomalia).
+
+#### A validação em perfil `showcase` é dura, e valeu
+
+Ela exige `ok: true` com 9 verificações e **zero avisos**: reprova rótulo em cima de rota, rota
+atravessando nó, segmento curto demais, corredor ambíguo. **Nenhum dos quatro passou de
+primeira.**
+
+O ciclo de vida gerou **mais de 80 erros** — todos consequência de **um** detalhe: faltava uma
+lane com id `main`, que é o trilho de fases. Sem ela, todos os estados colapsaram na mesma faixa.
+Corrigido o id, sobraram 9. Foi um bom lembrete de que uma parede de diagnósticos costuma ter uma
+causa só, e ler todos antes de corrigir qualquer um economiza tempo.
+
+**Rótulo é o que mais colide.** Metade dos erros sumiu ao remover rótulos que só repetiam o nome
+do nó de destino — `delivered` numa seta que chega em `DELIVERED`. O guia da ferramenta pede
+rótulos esparsos logo na primeira página, e eu tinha ignorado.
+
+**Quando duas correções de geometria seguidas falham, o problema é estrutural.** No fluxo de
+dados, `channelX` não resolveu um corredor disputado em duas tentativas. A saída foi mudar o
+desenho: `SEM_DADOS` deixou de ser nó de destino e virou o que a decisão **recebe** quando não há
+base. Validou — e ficou mais fiel ao que o código faz.
+
+#### O SVG não é um recorte do HTML
+
+O archify entrega HTML interativo, e o GitHub não renderiza HTML do repositório no README. Para o
+projeto ter figura na página inicial, nasceu o
+[extrai_svg_dos_diagramas.py](../scripts/extrai_svg_dos_diagramas.py), que resolve três coisas que
+um recorte ingênuo não resolveria:
+
+| Problema | Sintoma se ignorado |
+|---|---|
+| O CSS mora na página, não no SVG | diagrama sem estilo nenhum |
+| `data-detail-anchor` é atributo sem valor — válido em HTML, **inválido em XML** | imagem não aparece, **sem erro** |
+| O SVG não tem fundo; quem pinta é o `<body>` | texto branco sobre fundo branco |
+
+O segundo me custou duas tentativas: minha primeira normalização corrompia **valores** de
+atributo, transformando o `L` de `d="M 40 0 L 0 0"` num atributo — e o XML quebrava num ponto sem
+relação com o problema.
+
+**Verificado com os olhos, e não só pelo validador:** renderizei os quatro SVG em PNG com Chrome
+headless e olhei um por um. O validador do archify garante composição; ele não garante que o CSS
+sobreviveu à extração.

@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Da observação de preço à decisão de alertar",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "acumulo",
+        "label": "O histórico se acumula",
+        "focus": [
+          "varredura",
+          "observacao",
+          "stats"
+        ],
+        "note": "Cada varredura grava observações. A estatística da rota só existe porque elas se acumulam ao longo do tempo."
+      },
+      {
+        "id": "analise",
+        "label": "Três leituras do mesmo histórico",
+        "focus": [
+          "stats",
+          "anomalia",
+          "score",
+          "tendencia"
+        ],
+        "note": "Mediana e quartis, e não média: preço de passagem tem cauda longa à direita, e a média a segue."
+      },
+      {
+        "id": "silencio",
+        "label": "Sem base, o sistema se cala",
+        "focus": [
+          "stats",
+          "decisao"
+        ],
+        "note": "SEM_DADOS é diferente de NORMAL. Sem histórico não há nota, não há comparação, e não há tendência preliminar."
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "Coleta"
+    },
+    {
+      "label": "Histórico"
+    },
+    {
+      "label": "Análise"
+    },
+    {
+      "label": "Decisão"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "varredura",
+      "type": "backend",
+      "label": "Varredura",
+      "sublabel": "camadas 1 e 2",
+      "stage": 0,
+      "row": 1,
+      "tag": "a cada ciclo"
+    },
+    {
+      "id": "observacao",
+      "type": "database",
+      "label": "price_observation",
+      "sublabel": "um preço, um instante",
+      "stage": 1,
+      "row": 1
+    },
+    {
+      "id": "stats",
+      "type": "backend",
+      "label": "Estatística da rota",
+      "sublabel": "mediana, quartis, IQR",
+      "stage": 2,
+      "row": 1,
+      "tag": "robusta"
+    },
+    {
+      "id": "anomalia",
+      "type": "backend",
+      "label": "Anomalia",
+      "sublabel": "regra de Tukey",
+      "stage": 2,
+      "row": 3
+    },
+    {
+      "id": "tendencia",
+      "type": "backend",
+      "label": "Tendência",
+      "sublabel": "Theil–Sen",
+      "stage": 2,
+      "row": 0
+    },
+    {
+      "id": "score",
+      "type": "backend",
+      "label": "Flight Score",
+      "sublabel": "0 a 100",
+      "stage": 3,
+      "row": 0
+    },
+    {
+      "id": "decisao",
+      "type": "backend",
+      "label": "Decisão de alertar",
+      "sublabel": "teto e anti-spam",
+      "stage": 3,
+      "row": 1,
+      "tag": "alerta"
+    }
+  ],
+  "flows": [
+    {
+      "id": "grava",
+      "from": "varredura",
+      "to": "observacao",
+      "label": "preço observado",
+      "classification": "confirmado pela camada 2",
+      "variant": "emphasis",
+      "labelDy": 53
+    },
+    {
+      "id": "agrega",
+      "from": "observacao",
+      "to": "stats",
+      "label": "histórico da rota",
+      "classification": "janela móvel"
+    },
+    {
+      "id": "para-anomalia",
+      "from": "stats",
+      "to": "anomalia",
+      "classification": "p25 − 1,5 × IQR",
+      "label": "compara"
+    },
+    {
+      "id": "para-tendencia",
+      "from": "stats",
+      "to": "tendencia",
+      "classification": "inclinação mediana",
+      "label": "ao longo do tempo"
+    },
+    {
+      "id": "para-score",
+      "from": "tendencia",
+      "to": "score",
+      "classification": "aspectos ponderados",
+      "label": "pondera"
+    },
+    {
+      "id": "anomalia-decide",
+      "from": "anomalia",
+      "to": "decisao",
+      "label": "abaixo do normal",
+      "toSide": "bottom"
+    },
+    {
+      "id": "score-decide",
+      "from": "score",
+      "to": "decisao",
+      "label": "nota do voo"
+    },
+    {
+      "id": "sem-base",
+      "from": "stats",
+      "to": "decisao",
+      "label": "SEM_DADOS",
+      "variant": "dashed",
+      "classification": "sem base",
+      "toSide": "left",
+      "fromSide": "right",
+      "labelAt": [
+        616,
+        340
+      ]
+    }
+  ]
+}

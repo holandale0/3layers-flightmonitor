@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Ciclo de vida do alerta — o que o sistema sabe, e quando",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "whatsapp",
+        "label": "No WhatsApp, aceito não é entregue",
+        "focus": [
+          "pendente",
+          "aceito",
+          "entregue",
+          "lido"
+        ],
+        "note": "O alerta para em ACCEPTED até o webhook da Meta chegar. Foi a lição do BUG-007: mensagens aceitas nunca chegavam."
+      },
+      {
+        "id": "email",
+        "label": "Por e-mail, acaba antes",
+        "focus": [
+          "pendente",
+          "enviado"
+        ],
+        "note": "Não há webhook que confirme e-mail. SENT quer dizer 'o SMTP aceitou', e é tudo que dá para afirmar com honestidade."
+      },
+      {
+        "id": "falhas",
+        "label": "As duas falhas são diferentes",
+        "focus": [
+          "pendente",
+          "retentar",
+          "falhou"
+        ],
+        "note": "Transitória volta para a fila; permanente vai direto ao fim, sem gastar tentativa nem adiar o diagnóstico."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Entrega e confirmação"
+    },
+    {
+      "id": "recuperacao",
+      "label": "Retentativa"
+    },
+    {
+      "id": "terminal",
+      "label": "Fim"
+    }
+  ],
+  "states": [
+    {
+      "id": "pendente",
+      "type": "start",
+      "label": "PENDING",
+      "sublabel": "gravado, não enviado",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "aceito",
+      "type": "waiting",
+      "label": "ACCEPTED",
+      "sublabel": "a Meta recebeu",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "WhatsApp"
+    },
+    {
+      "id": "entregue",
+      "type": "active",
+      "label": "DELIVERED",
+      "sublabel": "chegou no aparelho",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "webhook"
+    },
+    {
+      "id": "lido",
+      "type": "success",
+      "label": "READ",
+      "sublabel": "a pessoa abriu",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "webhook"
+    },
+    {
+      "id": "retentar",
+      "type": "failure",
+      "label": "Falha transitória",
+      "sublabel": "rede, 5xx, timeout",
+      "lane": "recuperacao",
+      "col": 2,
+      "tag": "até 3x"
+    },
+    {
+      "id": "enviado",
+      "type": "success",
+      "label": "SENT",
+      "sublabel": "o SMTP aceitou",
+      "lane": "terminal",
+      "col": 0,
+      "tag": "e-mail"
+    },
+    {
+      "id": "falhou",
+      "type": "failure",
+      "label": "FAILED",
+      "sublabel": "retentar não adianta",
+      "lane": "terminal",
+      "col": 1,
+      "tag": "terminal"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "envia-whatsapp",
+      "from": "pendente",
+      "to": "aceito",
+      "variant": "emphasis",
+      "channelY": 157
+    },
+    {
+      "id": "webhook-entrega",
+      "from": "aceito",
+      "to": "entregue"
+    },
+    {
+      "id": "webhook-leitura",
+      "from": "entregue",
+      "to": "lido"
+    },
+    {
+      "id": "envia-email",
+      "from": "pendente",
+      "to": "enviado",
+      "label": "e-mail: acaba aqui"
+    },
+    {
+      "id": "cai",
+      "from": "pendente",
+      "to": "retentar",
+      "label": "rede ou 5xx"
+    },
+    {
+      "id": "volta",
+      "from": "retentar",
+      "to": "pendente",
+      "label": "tenta de novo",
+      "variant": "dashed",
+      "labelDy": 26
+    },
+    {
+      "id": "desiste",
+      "from": "retentar",
+      "to": "falhou",
+      "label": "3 tentativas"
+    },
+    {
+      "id": "permanente",
+      "from": "pendente",
+      "to": "falhou",
+      "label": "falha permanente",
+      "variant": "security",
+      "labelDy": 26,
+      "labelDx": 90
+    }
+  ]
+}

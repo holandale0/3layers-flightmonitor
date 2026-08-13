@@ -85,6 +85,8 @@ projeto levou dias e duas rejeições. **Comece pelo e-mail.** Trocar de canal d
 
 ## Arquitetura
 
+![Arquitetura dos serviços](diagrams/arquitetura.svg)
+
 | Componente | Stack | Porta | Papel |
 |---|---|---|---|
 | `core-java/` | Java 21 + Spring Boot 4.1 | 8081 | API, agendamento, persistência, regras de alerta |
@@ -114,6 +116,20 @@ Nada é alertado sem passar pela camada 2. Se ela cair, o sistema **não alerta 
 confirmado** — ele diz que não conseguiu confirmar. Ver
 [docs/FRAGILIDADE-CAMADA-2.md](docs/FRAGILIDADE-CAMADA-2.md).
 
+![Da varredura ao alerta](diagrams/coleta.svg)
+
+Repare no último passo: o preço confirmado **ainda pode não virar alerta**. Teto, anti-spam e
+análise decidem depois.
+
+### O que o sistema sabe sobre a entrega
+
+![Ciclo de vida do alerta](diagrams/alerta.svg)
+
+`ACCEPTED` e `SENT` não são a mesma coisa, e a diferença custou um bug para ser aprendida. No
+WhatsApp o alerta para em `ACCEPTED` até o webhook da Meta chegar — *a Meta recebeu* não é
+*chegou no aparelho*. No e-mail não há webhook nenhum, então `SENT` quer dizer "o servidor SMTP
+aceitou", e é tudo que dá para afirmar com honestidade.
+
 ## O princípio que atravessa o projeto
 
 **Dizer o que não se sabe.** Sem histórico suficiente, o sistema se cala em vez de opinar: não há
@@ -123,6 +139,12 @@ nota, não há comparação com a mediana, não há "tendência preliminar". `SE
 É por isso que a análise usa estatística robusta a cauda longa — mediana e quartis, regra de Tukey
 para anomalia, Theil–Sen para tendência — em vez de média e desvio padrão, que preço de passagem
 distorce.
+
+![Da observação de preço à decisão de alertar](diagrams/analise.svg)
+
+> Os diagramas acima são retratos estáticos. As versões **interativas** — com rastreamento de
+> rota, visões guiadas e tema claro/escuro — estão em [diagrams/](diagrams/), junto de como
+> foram geradas.
 
 ## Desenvolvimento
 

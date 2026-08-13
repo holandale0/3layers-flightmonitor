@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Coleta em duas camadas — da varredura ao alerta",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "varredura",
+        "label": "Camada 1 — varredura ampla",
+        "focus": [
+          "scheduler",
+          "core",
+          "worker",
+          "travelpayouts"
+        ],
+        "note": "Uma chamada devolve o menor preço de cada dia do mês. Barata e ampla, porém com dados cacheados."
+      },
+      {
+        "id": "confirmacao",
+        "label": "Camada 2 — confirmação",
+        "focus": [
+          "core",
+          "worker",
+          "googleflights"
+        ],
+        "note": "Só o candidato mais barato é confirmado. Nada é alertado sem passar por aqui."
+      },
+      {
+        "id": "decisao",
+        "label": "Decisão e entrega",
+        "focus": [
+          "core",
+          "banco",
+          "canal"
+        ],
+        "note": "O preço confirmado ainda pode não virar alerta: teto, anti-spam e análise decidem depois."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "scheduler",
+      "type": "backend",
+      "label": "Scheduler",
+      "sublabel": "a cada N minutos"
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "core-java",
+      "sublabel": "decide"
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "worker-python",
+      "sublabel": "só busca"
+    },
+    {
+      "id": "travelpayouts",
+      "type": "external",
+      "label": "Travelpayouts",
+      "sublabel": "camada 1"
+    },
+    {
+      "id": "googleflights",
+      "type": "external",
+      "label": "fast-flights",
+      "sublabel": "camada 2 · Google"
+    },
+    {
+      "id": "banco",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "histórico"
+    },
+    {
+      "id": "canal",
+      "type": "external",
+      "label": "Canal",
+      "sublabel": "WhatsApp ou e-mail"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 300,
+      "label": "Varredura ampla"
+    },
+    {
+      "from": 320,
+      "to": 430,
+      "label": "Confirmação pontual"
+    },
+    {
+      "from": 450,
+      "to": 600,
+      "label": "Decisão e entrega"
+    }
+  ],
+  "messages": [
+    {
+      "id": "dispara",
+      "from": "scheduler",
+      "to": "core",
+      "y": 185,
+      "label": "monitores vencidos",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pede-calendario",
+      "from": "core",
+      "to": "worker",
+      "y": 225,
+      "label": "buscar rota e janela"
+    },
+    {
+      "id": "calendario",
+      "from": "worker",
+      "to": "travelpayouts",
+      "y": 262,
+      "label": "mês inteiro numa chamada"
+    },
+    {
+      "id": "precos",
+      "from": "travelpayouts",
+      "to": "worker",
+      "y": 292,
+      "label": "preço mais barato por dia",
+      "variant": "return"
+    },
+    {
+      "id": "candidatos",
+      "from": "worker",
+      "to": "core",
+      "y": 330,
+      "label": "candidatos abaixo do teto",
+      "variant": "return"
+    },
+    {
+      "id": "pede-confirmacao",
+      "from": "core",
+      "to": "worker",
+      "y": 368,
+      "label": "confirmar o melhor",
+      "variant": "emphasis"
+    },
+    {
+      "id": "confirma",
+      "from": "worker",
+      "to": "googleflights",
+      "y": 402,
+      "label": "companhia e escalas"
+    },
+    {
+      "id": "confirmado",
+      "from": "googleflights",
+      "to": "core",
+      "y": 435,
+      "label": "preço real",
+      "variant": "return"
+    },
+    {
+      "id": "grava",
+      "from": "core",
+      "to": "banco",
+      "y": 480,
+      "label": "grava observação e estatística"
+    },
+    {
+      "id": "alerta",
+      "from": "core",
+      "to": "canal",
+      "y": 545,
+      "label": "só se sobreviver ao teto, ao anti-spam e à análise",
+      "variant": "emphasis"
+    }
+  ]
+}
