@@ -76,8 +76,10 @@ function periodo(m: Monitor) {
   return `${ida} · somente ida`
 }
 
-function escalas(max: number | null) {
-  if (max === null) return 'escalas livres'
+function escalas(max: number | null | undefined) {
+  // `== null` cobre null E undefined. Estrito (`===`) deixava passar campo
+  // ausente e a tela dizia "ate undefined escala" — o BUG-015.
+  if (max == null) return 'escalas livres'
   return max === 0 ? 'voo direto' : `até ${max} escala${max > 1 ? 's' : ''}`
 }
 </script>

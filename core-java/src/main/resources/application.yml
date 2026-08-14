@@ -32,7 +32,19 @@ spring:
     locations: classpath:db/migration
 
   jackson:
-    default-property-inclusion: non_null
+    # Nulo VAI no JSON, e nao e omitido — corrigido no BUG-015.
+    #
+    # Com `non_null`, um monitor sem limite de escalas chegava ao painel SEM a
+    # chave `maxStops`. O tipo do frontend sempre declarou `number | null`, e a
+    # API e que mentia: em JavaScript campo ausente e `undefined`, e
+    # `undefined === null` e falso. A tela mostrava "ate undefined escala", e o
+    # formulario de edicao marcava "janela de volta" num monitor de somente ida.
+    #
+    # Campo ausente e ambiguo — nao existe? nao se aplica? esqueceram? Nulo
+    # explicito diz uma coisa so: este campo nao tem valor. E o mesmo principio
+    # que o resto do projeto segue (SEM_DADOS != NORMAL, nulo != zero),
+    # aplicado ao formato do fio.
+    default-property-inclusion: always
 
   web:
     error:

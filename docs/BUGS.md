@@ -113,6 +113,64 @@ condição. É exatamente o argumento que justificou aquela etapa.
 
 ---
 
+### ~~BUG-015 · Campo nulo sumia do JSON e virava `undefined` no painel~~ — ✅ FECHADO
+**Status:** ✅ **fechado em 2026-08-14** — a API passou a enviar `null` explícito, e o painel
+ficou defensivo
+**Encontrado em:** 2026-08-14 · reportado pelo usuário · Componente: core-java (serialização) + frontend
+**Severidade:** média no sintoma visível, **alta no invisível**
+
+**Sintoma relatado:** um monitor CGH → BEL exibia **"até `undefined` escala"** no cartão.
+
+**O relato dizia "o destino apareceu como undefined", e o destino estava correto** — o cabeçalho
+mostrava `CGH → BEL`. O `undefined` estava no campo de **escalas máximas**, uma linha abaixo.
+Vale registrar porque procurar o bug no lugar apontado teria custado tempo: o valor errado
+raramente está no campo que parece.
+
+**Causa:** `spring.jackson.default-property-inclusion: non_null` fazia a API **omitir** as
+propriedades nulas. Um monitor sem limite de escalas chegava ao painel **sem a chave**
+`maxStops`:
+
+```json
+{ "origin": "CGH", "destination": "BEL", "maxPrice": 700 }
+```
+
+O tipo do frontend sempre declarou `maxStops: number | null` — **era a API que mentia**. Em
+JavaScript campo ausente é `undefined`, e `undefined === null` é `false`:
+
+```js
+function escalas(max: number | null) {
+  if (max === null) return 'escalas livres'   // undefined nao entra aqui
+  return `ate ${max} escala`                  // "ate undefined escala"
+}
+```
+
+**O sintoma invisível era pior.** `paraRequest` copiava os campos crus para o formulário de
+edição, e o `MonitorForm` fazia `comVolta = form.returnWindowStart !== null`. Com `undefined`,
+isso dava **`true`**: abrir para editar um monitor de somente ida marcava "definir janela de
+volta", e o `watch` preenchia as datas sozinho. **Editar e salvar converteria o monitor em ida e
+volta**, sem ninguém pedir.
+
+**Correção, em duas frentes:**
+
+1. **A causa raiz** — `default-property-inclusion: always`. Campo ausente é ambíguo (não
+   existe? não se aplica? esqueceram?); `null` explícito diz uma coisa só. É o mesmo princípio
+   que o projeto aplica em toda parte — `SEM_DADOS ≠ NORMAL`, nulo ≠ zero — agora no formato do
+   fio. O ganho de bytes nunca pagou o custo de o cliente adivinhar.
+2. **O painel ficou defensivo assim mesmo** — `?? null` em `paraRequest` e `== null` em
+   `escalas`. Depender de o servidor ser perfeito é a metade frágil de qualquer correção.
+
+`??` e não `||`: com `||`, `maxStops: 0` — que significa **voo direto** — viraria nulo, que
+significa "sem preferência". São coisas opostas, e há teste para isso.
+
+**Verificado:** o `ContratoJsonTest` reprova com a configuração antiga (4 de 4), citando o bug na
+mensagem. A asserção usa `has(campo)` e não `get(campo)` — `get` devolveria null nos dois casos e
+passaria com o bug presente.
+
+**A lição:** o tipo do cliente e o formato do servidor são um contrato, e nada estava verificando
+que as duas pontas concordavam. Agora estão.
+
+---
+
 ### ~~BUG-014 · A camada 2 inteira estava comentada no requirements.txt~~ — ✅ FECHADO
 **Status:** ✅ **fechado em 2026-08-13** — declarada, e guardada por teste
 **Encontrado em:** 2026-08-13 · Etapa E4.2 · Componente: worker-python (dependências)

@@ -102,20 +102,35 @@ export function monitorVazio(): MonitorRequest {
   }
 }
 
+/**
+ * Converte um monitor no payload de edicao.
+ *
+ * <b>Normaliza ausente para nulo</b> (`?? null`), e nao copia cru. Foi o
+ * BUG-015: a API omitia campos nulos, o valor chegava `undefined`, e toda
+ * comparacao com `null` falhava — a tela mostrava "ate undefined escala" e o
+ * formulario marcava "janela de volta" num monitor de somente ida, chegando a
+ * transformar um no outro ao salvar.
+ *
+ * A API foi corrigida para mandar nulo explicito. Isto aqui fica assim mesmo:
+ * depender de o servidor ser perfeito e a metade fragil de qualquer correcao.
+ *
+ * `??` e nao `||`: com `||`, `maxStops: 0` — que significa <b>voo direto</b> —
+ * viraria nulo, que significa "sem preferencia". Sao coisas opostas.
+ */
 export function paraRequest(m: Monitor): MonitorRequest {
   return {
-    label: m.label,
+    label: m.label ?? null,
     origin: m.origin,
     destination: m.destination,
     departureWindowStart: m.departureWindowStart,
     departureWindowEnd: m.departureWindowEnd,
-    returnWindowStart: m.returnWindowStart,
-    returnWindowEnd: m.returnWindowEnd,
-    minStayDays: m.minStayDays,
-    maxStayDays: m.maxStayDays,
+    returnWindowStart: m.returnWindowStart ?? null,
+    returnWindowEnd: m.returnWindowEnd ?? null,
+    minStayDays: m.minStayDays ?? null,
+    maxStayDays: m.maxStayDays ?? null,
     maxPrice: m.maxPrice,
     currency: m.currency,
-    maxStops: m.maxStops,
+    maxStops: m.maxStops ?? null,
     passengers: m.passengers,
     active: m.active,
     searchIntervalMinutes: m.searchIntervalMinutes,
