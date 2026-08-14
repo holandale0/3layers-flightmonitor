@@ -89,6 +89,12 @@ services:
       # pessoa. No desenvolvimento fica vazio, e o log volta a ser legivel.
       LOG_FORMAT: ${LOG_FORMAT:-ecs}
 
+      # Canario das fontes externas (E4.5). Desligado por padrao: consulta as
+      # APIs reais e gasta cota de duas fontes gratuitas.
+      CANARIO_ENABLED: ${CANARIO_ENABLED:-false}
+      CANARIO_INTERVAL: ${CANARIO_INTERVAL:-PT24H}
+      CANARIO_INITIAL_DELAY: ${CANARIO_INITIAL_DELAY:-PT2M}
+
       NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-LOG}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}

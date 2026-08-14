@@ -303,7 +303,7 @@ marcada como concluída em [PROGRESSO.md](PROGRESSO.md).
 | **E4.2** | Dockerização completa dos 3 serviços | ✅ `docker compose up` sobe os 5 containers. Banco `flightmon_test` separado fecha o [RISCO-008](BUGS.md). Ciclo completo validado em container, nos **dois** transportes |
 | **E4.3** | Observabilidade | ✅ log ECS em JSON no container, métricas de negócio em `/actuator/prometheus`, e o sinal que teria pegado o [BUG-014](BUGS.md). [D-101](DECISOES.md) · [D-102](DECISOES.md) |
 | **E4.4** | Deploy | Ambiente rodando de forma contínua |
-| **E4.5** | **Canário ao vivo** das fontes externas | Rotina agendada consulta as APIs reais e avisa quando o formato mudar |
+| **E4.5** | **Canário ao vivo** das fontes externas | ✅ sonda de **formato** (campo, tipo e plausibilidade) nas duas camadas, agendada e fora do CI. Um teste para cada uma das três quebras reais do [RISCO-002](BUGS.md). [D-103](DECISOES.md) · [D-104](DECISOES.md) |
 | **E4.7** | **Configuração do canal por tela** | ✅ `phone_number_id`, `waba_id`, template e idioma no banco, editáveis sem reiniciar. Segredos seguem no ambiente. [D-100](DECISOES.md) |
 | **E4.6** | **Canal de e-mail** | ✅ terceira implementação de `NotificationChannel`, escolhida por `NOTIFICATION_CHANNEL=EMAIL`. Migration V7 aditiva, WhatsApp intocado. Testado contra SMTP falso, sem mandar e-mail de verdade. [D-097](DECISOES.md) · [D-098](DECISOES.md) · [GUIA-EMAIL.md](GUIA-EMAIL.md) |
 

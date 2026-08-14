@@ -70,7 +70,7 @@
 | E4.2 | Dockerização completa | ✅ concluída |
 | E4.3 | Observabilidade | ✅ concluída |
 | E4.4 | Deploy | ⬜ pendente |
-| E4.5 | **Canário ao vivo** das fontes | ⬜ pendente |
+| E4.5 | **Canário ao vivo** das fontes | ✅ concluída |
 | E4.6 | **Canal de e-mail** | ✅ concluída |
 | E4.7 | **Configuração do canal por tela** | ✅ concluída |
 
@@ -3258,3 +3258,71 @@ flightmonitor_busca_duracao_seconds_sum 3.551434873
 deploy, observabilidade seja configuração de infraestrutura e não mudança de código.
 
 **Placar:** core-java **401**, worker-python **95**, frontend-vue **36**.
+
+---
+
+### 2026-08-14 — ✅ E4.5 concluída · O canário olha o formato, não o pulso
+
+A última defesa contra o [RISCO-002](BUGS.md): descobrir que o Google mudou o formato **antes** de
+deixar de receber alertas, e não seis semanas depois.
+
+#### Por que "a fonte respondeu 200" não protege de nada
+
+As **três quebras reais** que este projeto já viu na camada 2 passariam por qualquer teste de
+disponibilidade:
+
+| O que aconteceu | O que um ping teria dito |
+|---|---|
+| a API da biblioteca mudou inteira entre 2.x e 3.x | nada — nem chegou a rodar |
+| `list[Airline]` anotado, `list[str]` em execução | 200 OK |
+| o parser devolveu `time=[None, 45]`, sem a hora | 200 OK |
+
+Por isso a sonda olha **campo a campo**: presença, tipo e plausibilidade. Há um teste para cada
+uma das três, exigindo que ela acuse — canário que não pega as falhas conhecidas não protege de
+nada ([D-103](DECISOES.md)).
+
+Duas escolhas de sonda que evitam falso alarme: **rota fixa e movimentada** (GRU–GIG a 30 dias),
+porque rota rara devolveria vazio por falta de voo e "vazio" seria lido como "fonte quebrada"; e
+**a sonda nunca propaga exceção**, porque se lançasse, uma fonte instável derrubaria a rotina que
+existe para observar fontes instáveis.
+
+#### Como ele avisa — e por que não pelo WhatsApp
+
+Log em `ERROR`, métrica e último resultado guardado. **Não** pelo canal de alerta
+([D-104](DECISOES.md)): o template aprovado pela Meta diz *"Encontrei uma passagem dentro do preço
+que você definiu"*, e usá-lo para avisar que uma biblioteca mudou de formato seria mentir para
+quem recebe — e provavelmente custar a aprovação do template.
+
+**O gauge tem três valores, e não dois:**
+
+```
+flightmonitor_canario_saudavel  1  saudável
+                                0  formato mudou   -> olhe as fontes
+                               -1  não consultado  -> olhe o worker
+```
+
+O `-1` é o que mais importa. Sem ele, worker fora do ar apareceria como fonte quebrada, e o alarme
+mandaria procurar no lugar errado justamente quando o tempo importa. É o `SEM_DADOS ≠ NORMAL`
+aplicado à operação.
+
+#### Validado contra as APIs de verdade
+
+```
+saudavel: True
+  camada 1 (travelpayouts): formato_ok=True  ofertas=4   533ms
+  camada 2 (fast-flights):  formato_ok=True  ofertas=1  1582ms
+```
+
+E o ciclo agendado inteiro, em container:
+
+```
+{"log":{"level":"INFO","logger":"...CanarioScheduler"},
+ "message":"canario ok: as 2 camada(s) responderam no formato esperado"}
+
+flightmonitor_canario_saudavel 1.0
+```
+
+**Desligado por padrão** e **uma vez por dia**: ele gasta cota de duas fontes gratuitas, e formato
+de API não muda de hora em hora.
+
+**Placar:** core-java **406**, worker-python **104**, frontend-vue **36**.

@@ -1605,6 +1605,55 @@ O formato é **ECS** (Elastic Common Schema) porque ele já traz `service.name`,
 `process.thread.name` e `log.logger` com nomes que as ferramentas conhecem — log estruturado com
 chave inventada dá o trabalho de estruturar sem a vantagem de ser lido.
 
+### D-103 · O canário verifica **formato**, e não disponibilidade ✅
+**Decisão:** a sonda confere campo a campo — presença, tipo e plausibilidade — nas respostas
+reais das duas camadas. Não basta a fonte responder 200.
+
+**Por quê:** as **três quebras reais** que este projeto já viu na camada 2 passariam por qualquer
+teste de disponibilidade:
+
+| O que aconteceu | O que um ping teria dito |
+|---|---|
+| a API da biblioteca mudou inteira entre 2.x e 3.x | nada — nem chegou a rodar |
+| `list[Airline]` anotado, `list[str]` em execução | 200 OK |
+| o parser devolveu `time=[None, 45]`, sem a hora | 200 OK |
+
+Há um teste para cada uma delas, exigindo que a sonda a acuse. Canário que não pega as falhas
+conhecidas não protege de nada.
+
+**Rota de sonda fixa e movimentada** (GRU–GIG, 30 dias à frente): rota rara devolveria vazio por
+falta de voo, e "vazio" seria confundido com "a fonte quebrou".
+
+**A sonda nunca propaga exceção.** Se lançasse, uma fonte instável derrubaria a rotina que existe
+justamente para observar fontes instáveis.
+
+**HTTP 200 mesmo com problema.** O resultado do canário é **dado**, e não erro de requisição.
+Usar 5xx faria um proxy no meio do caminho transformar diagnóstico em falha de rede.
+
+### D-104 · O canário avisa por log, métrica e saúde — não pelo canal de alerta ✅
+**Decisão:** formato quebrado vira `log.error`, `flightmonitor.canario.saudavel = 0` e registro do
+último resultado. **Não** vira mensagem de WhatsApp nem e-mail.
+
+**Por quê:** o template aprovado pela Meta diz *"Encontrei uma passagem dentro do preço que você
+definiu"*. Usá-lo para avisar que uma biblioteca mudou de formato seria mentir para quem recebe
+e, provavelmente, custar a aprovação do template — a Meta revisa uso, e não só conteúdo.
+
+Transformar o canário numa mensagem exige um **segundo formato**, com aprovação própria. Essa
+decisão pertence à E4.4, quando existir um ambiente rodando de forma contínua para receber o
+aviso — antes disso seria construir o canal e não ter para onde mandar.
+
+**O gauge tem três valores, e não dois:** `1` saudável, `0` com problema, **`-1` não consultado**.
+O `-1` é o que mais importa: sem ele, worker fora do ar apareceria como fonte quebrada, e o
+alarme mandaria olhar o lugar errado justamente quando o tempo importa. É o mesmo princípio de
+`SEM_DADOS ≠ NORMAL`, aplicado à operação.
+
+**Desligado por padrão** (`CANARIO_ENABLED=false`): ele consulta APIs reais e gasta cota de duas
+fontes gratuitas. Quem acabou de clonar o projeto não deve pagar esse custo sem pedir.
+
+**Uma vez por dia.** Formato de API não muda de hora em hora, e cada execução gasta cota. Rodar
+de minuto em minuto não antecipa a descoberta em nada útil e aproxima o bloqueio por excesso de
+requisições (RISCO-004).
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

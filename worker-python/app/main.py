@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.boundary.amqp.consumidor import iniciar_em_segundo_plano
-from app.boundary.http import health, nlp, search
+from app.boundary.http import canario, health, nlp, search
 from app.config import get_settings
 
 settings = get_settings()
@@ -54,3 +54,4 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(search.router)
 app.include_router(nlp.router)
+app.include_router(canario.router)

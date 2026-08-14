@@ -195,6 +195,16 @@ flightmonitor:
     app-secret: ${WHATSAPP_APP_SECRET:}
     timeout: PT20S
 
+  # Canario das fontes externas — etapa E4.5.
+  #
+  # DESLIGADO por padrao: ele consulta as APIs reais e gasta cota de duas fontes
+  # gratuitas. Quem acabou de clonar o projeto nao deve pagar esse custo sem
+  # pedir. Ligar exige token da Travelpayouts configurado.
+  canario:
+    enabled: ${CANARIO_ENABLED:false}
+    interval: ${CANARIO_INTERVAL:PT24H}
+    initial-delay: ${CANARIO_INITIAL_DELAY:PT2M}
+
   email:
     # Precisa ser a MESMA conta autenticada em spring.mail.username, ou um alias
     # ja verificado em "Enviar e-mail como": qualquer outro endereco o Gmail
