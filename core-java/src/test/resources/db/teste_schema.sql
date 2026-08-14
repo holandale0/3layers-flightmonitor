@@ -45,7 +45,7 @@ SELECT deve_rejeitar($$INSERT INTO monitor (origin, destination, departure_windo
     VALUES ('GRU','LIS','2027-03-10','2027-03-20',3200,15,10)$$, 'permanencia minima maior que a maxima');
 
 SELECT deve_rejeitar($$INSERT INTO monitor (origin, destination, departure_window_start, departure_window_end, max_price, search_interval_minutes)
-    VALUES ('GRU','LIS','2027-03-10','2027-03-20',3200,1)$$, 'intervalo de busca menor que 5 min');
+    VALUES ('GRU','LIS','2027-03-10','2027-03-20',3200,9)$$, 'intervalo de busca menor que 10 min');
 
 
 -- -------------------------------------------------------------- recipient

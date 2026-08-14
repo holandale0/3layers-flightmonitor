@@ -1681,6 +1681,35 @@ tela mostra outra, e salvar guardaria o valor velho achando que mudou.
 **A conversão mora em `lib/data.ts`, pura e testada** — é a parte que erra. O componente só liga
 os fios.
 
+### D-106 · Intervalo mínimo de varredura sobe de 5 para 10 minutos ✅
+**Decisão:** `search_interval_minutes >= 10`, verificado em **três camadas** — CHECK no banco,
+`@Min` no DTO e `min` no formulário.
+
+**Por quê:** cinco minutos era generoso demais para o que as fontes suportam. As duas são
+gratuitas e **não contratadas**: a Travelpayouts publica limite de 300 req/min, e a camada 2 não
+publica limite nenhum — o que não significa que não exista, significa que você descobre qual é
+quando for bloqueado ([RISCO-004](BUGS.md)).
+
+**E o ganho de varrer de 5 em 5 minutos é próximo de zero.** Preço de passagem muda em minutos,
+mas a camada 1 devolve dado **cacheado**, com horas de atraso. Consultar mais rápido que o cache
+atualiza gasta cota para reler a mesma resposta — custo real, benefício imaginário.
+
+**Três camadas, e não uma.** O formulário evita a ida ao servidor; o DTO devolve mensagem com o
+campo marcado; o CHECK protege contra carga manual, script e bug nosso. As duas primeiras são
+conveniência; a terceira é a garantia.
+
+**A regra vale também na edição**, e há teste para isso: regra que vale só na criação é regra que
+se contorna — bastaria criar com 10 e editar para 1.
+
+**A migration sobe quem estava abaixo**, em vez de recusar a subir. O `UPDATE` vem **antes** do
+CHECK: na ordem inversa, a migration falharia em qualquer instalação com um monitor abaixo de 10,
+no meio do deploy e com o schema pela metade.
+
+**O que esta regra não cobre:** a busca manual (`POST /monitors/{id}/search`) continua sem trava.
+Ela é disparada por uma pessoa, uma de cada vez, e cada uma leva alguns segundos — o risco real
+de bloqueio vem da repetição **desassistida**, que é justamente o que o intervalo controla.
+Registrado aqui para ser decisão, e não esquecimento.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

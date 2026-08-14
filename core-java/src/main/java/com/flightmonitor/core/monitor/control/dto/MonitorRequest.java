@@ -69,7 +69,10 @@ public record MonitorRequest(
 
         Boolean active,
 
-        @Min(value = 5, message = "intervalo minimo de 5 minutos, para nao abusar das fontes de preco")
+        @Min(
+                value = 10,
+                message = "intervalo minimo de 10 minutos: as fontes sao gratuitas e a camada 1 "
+                        + "devolve dado cacheado, entao varrer mais rapido gasta cota para reler o mesmo preco")
         Integer searchIntervalMinutes,
 
         Set<Long> recipientIds,

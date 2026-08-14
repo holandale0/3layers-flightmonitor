@@ -72,3 +72,39 @@ antiga enquanto a tela mostra outra, e salvar guardaria o valor velho achando qu
 expectativa, e não o comportamento.
 
 **Placar:** core-java **410**, worker-python **104**, frontend-vue **64**.
+
+---
+
+### 2026-08-14 — 🛡️ Intervalo mínimo de varredura: 10 minutos
+
+Pedido do usuário: impedir frequência de consulta abaixo de 10 minutos. Era 5.
+
+**O motivo não é só educação com as fontes.** Preço de passagem muda em minutos, mas a camada 1
+devolve dado **cacheado**, com horas de atraso — varrer de 5 em 5 minutos gasta cota para reler a
+mesma resposta. Custo real, benefício imaginário ([D-106](DECISOES.md)).
+
+**Três camadas**, e cada uma faz uma coisa diferente:
+
+| Camada | Papel |
+|---|---|
+| `min="10"` no formulário | evita a ida ao servidor |
+| `@Min(10)` no DTO | devolve mensagem com o campo marcado |
+| `CHECK` no banco (V9) | protege contra carga manual, script e bug nosso |
+
+As duas primeiras são conveniência; a terceira é a garantia. Verifiquei as três no sistema
+rodando — inclusive tentando o `UPDATE` direto no banco, que foi recusado por
+`monitor_intervalo_valido`.
+
+**A regra vale na edição também**, com teste próprio: regra que vale só na criação se contorna
+criando com 10 e editando para 1.
+
+**A migration sobe o que estava abaixo.** Testei com um monitor "legado" de 5 minutos inserido
+direto no banco: a V9 o levou a 10 e deixou o de 60 intacto. O `UPDATE` vem **antes** do CHECK —
+na ordem inversa, a migration quebraria no meio do deploy em qualquer instalação que já tivesse
+um monitor abaixo do novo mínimo.
+
+**Uma brecha registrada:** a busca manual continua sem trava. É uma pessoa clicando, uma de cada
+vez, e o risco de bloqueio vem da repetição desassistida — mas fica escrito para ser decisão, e
+não esquecimento.
+
+**Placar:** core-java **414**, worker-python **104**, frontend-vue **64**.

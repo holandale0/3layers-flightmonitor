@@ -251,11 +251,14 @@ async function salvar() {
 
     <label class="campo">
       <span>Intervalo entre buscas (minutos)</span>
-      <input v-model.number="form.searchIntervalMinutes" type="number" min="5" />
+      <input v-model.number="form.searchIntervalMinutes" type="number" min="10" step="5" />
       <small v-if="erros.searchIntervalMinutes" class="erro">
         {{ erros.searchIntervalMinutes }}
       </small>
-      <small v-else class="ajuda">Mínimo de 5 minutos, para não abusar das fontes de preço.</small>
+      <small v-else class="ajuda">
+        Mínimo de <strong>10 minutos</strong>. As fontes são gratuitas e não contratadas, e a
+        camada 1 devolve preço em cache — varrer mais rápido gasta cota para reler o mesmo dado.
+      </small>
     </label>
 
     <fieldset>

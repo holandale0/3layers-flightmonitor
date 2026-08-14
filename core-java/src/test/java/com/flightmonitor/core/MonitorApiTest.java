@@ -433,4 +433,80 @@ class MonitorApiTest {
                 }
                 """.formatted(ida, ida.plusDays(10), lista);
     }
+
+    // =========================================================================
+    // Intervalo minimo de varredura (10 min) — protege as fontes gratuitas
+    // =========================================================================
+
+    @Test
+    @DisplayName("recusa intervalo abaixo de 10 minutos")
+    void intervaloAbaixoDoMinimo() throws Exception {
+        // O limite existe porque as duas fontes sao gratuitas e nao
+        // contratadas, e porque a camada 1 devolve dado CACHEADO: varrer mais
+        // rapido que o cache atualiza gasta cota para reler o mesmo preco.
+        mvc.perform(post("/api/monitors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadComIntervalo(9)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.searchIntervalMinutes",
+                        containsString("10 minutos")));
+    }
+
+    @Test
+    @DisplayName("aceita exatamente 10 minutos")
+    void intervaloNoLimite() throws Exception {
+        // O limite e inclusivo. Testar so o valor recusado deixaria passar um
+        // `>` no lugar de `>=` sem ninguem notar.
+        mvc.perform(post("/api/monitors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadComIntervalo(10)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.searchIntervalMinutes").value(10));
+    }
+
+    @Test
+    @DisplayName("recusa tambem na edicao, e nao so na criacao")
+    void intervaloAbaixoDoMinimoAoEditar() throws Exception {
+        // Uma regra que vale so na criacao e uma regra que se contorna: bastava
+        // criar com 10 e editar para 1.
+        String corpo = mvc.perform(post("/api/monitors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadComIntervalo(60)))
+                .andReturn().getResponse().getContentAsString();
+        long id = json.readTree(corpo).get("id").asLong();
+
+        mvc.perform(put("/api/monitors/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadComIntervalo(1)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("sem intervalo informado, vale o padrao de 6 horas")
+    void intervaloPadrao() throws Exception {
+        mvc.perform(post("/api/monitors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "origin": "GRU", "destination": "LIS",
+                                  "departureWindowStart": "2027-03-10",
+                                  "departureWindowEnd": "2027-03-20",
+                                  "maxPrice": 3200
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.searchIntervalMinutes").value(360));
+    }
+
+    private String payloadComIntervalo(int minutos) {
+        return """
+                {
+                  "origin": "GRU", "destination": "LIS",
+                  "departureWindowStart": "2027-03-10",
+                  "departureWindowEnd": "2027-03-20",
+                  "maxPrice": 3200,
+                  "searchIntervalMinutes": %d
+                }
+                """.formatted(minutos);
+    }
 }
