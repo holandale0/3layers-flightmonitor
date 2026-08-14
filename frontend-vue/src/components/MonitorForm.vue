@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import { ApiError, type ErrosPorCampo } from '@/api/http'
 import { listarDestinatarios } from '@/api/destinatarios'
+import CampoData from '@/components/CampoData.vue'
 import { atualizarMonitor, criarMonitor } from '@/api/monitores'
 import type { Monitor, MonitorRequest } from '@/model/monitor'
 import { monitorVazio, paraRequest } from '@/model/monitor'
@@ -159,14 +160,22 @@ async function salvar() {
       <div class="linha">
         <label class="campo">
           <span>De</span>
-          <input v-model="form.departureWindowStart" type="date" required />
+          <CampoData
+            v-model="form.departureWindowStart"
+            required
+            :invalido="!!erros.departureWindowStart"
+          />
           <small v-if="erros.departureWindowStart" class="erro">
             {{ erros.departureWindowStart }}
           </small>
         </label>
         <label class="campo">
           <span>Até</span>
-          <input v-model="form.departureWindowEnd" type="date" required />
+          <CampoData
+            v-model="form.departureWindowEnd"
+            required
+            :invalido="!!erros.departureWindowEnd"
+          />
           <small v-if="erros.departureWindowEnd" class="erro">
             {{ erros.departureWindowEnd }}
           </small>
@@ -184,12 +193,12 @@ async function salvar() {
       <div v-if="comVolta" class="linha">
         <label class="campo">
           <span>De</span>
-          <input v-model="form.returnWindowStart" type="date" />
+          <CampoData v-model="form.returnWindowStart" :invalido="!!erros.returnWindowStart" />
           <small v-if="erros.returnWindowStart" class="erro">{{ erros.returnWindowStart }}</small>
         </label>
         <label class="campo">
           <span>Até</span>
-          <input v-model="form.returnWindowEnd" type="date" />
+          <CampoData v-model="form.returnWindowEnd" :invalido="!!erros.returnWindowEnd" />
           <small v-if="erros.returnWindowEnd" class="erro">{{ erros.returnWindowEnd }}</small>
         </label>
       </div>

@@ -1654,6 +1654,33 @@ fontes gratuitas. Quem acabou de clonar o projeto não deve pagar esse custo sem
 de minuto em minuto não antecipa a descoberta em nada útil e aproxima o bloqueio por excesso de
 requisições (RISCO-004).
 
+### D-105 · Campo de data próprio, porque o nativo não obedece ✅
+**Decisão:** os campos de data do formulário deixam de ser `<input type="date">` e passam a ser um
+componente `CampoData` — texto em **dd/mm/aaaa** por fora, ISO por dentro — com o seletor nativo
+preservado atrás de um botão.
+
+**Por quê:** o `<input type="date">` exibe a data no formato do **navegador**, e não no da página.
+Foi **verificado**, e não suposto: com o Chrome em inglês, nem `lang="pt-BR"` no `<html>` — que
+este projeto já tinha — nem `lang="pt-BR"` no próprio campo mudam o `mm/dd/yyyy`. Não existe
+atributo que sobreponha isso; o valor no DOM é sempre ISO, e a máscara é do navegador.
+
+Num sistema em português, com datas de viagem, `03/05` significar março ou maio é a diferença
+entre viajar no outono e no inverno.
+
+**O calendário continua lá.** Trocar por um campo de texto e perder o seletor seria consertar uma
+coisa quebrando outra — pior ainda no celular, onde tocar num dia é muito melhor que digitar oito
+dígitos. O botão abre o seletor **nativo** via `showPicker()`, num `<input type="date">` que existe
+só para isso e fica fora do fluxo visual (mas **renderizado**: `showPicker()` não abre em elemento
+com `display: none`).
+
+**Data impossível limpa o valor, e não o mantém.** `31/02/2026` tem o formato certo e o dia
+errado; sem checagem, o `Date` do JavaScript "corrigiria" para 03/03 em silêncio. E emitir `null`
+é melhor que não emitir nada: com silêncio, o formulário ficaria com a data antiga enquanto a
+tela mostra outra, e salvar guardaria o valor velho achando que mudou.
+
+**A conversão mora em `lib/data.ts`, pura e testada** — é a parte que erra. O componente só liga
+os fios.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

@@ -31,3 +31,44 @@ do `ContratoJsonTest` reprovaram, citando o bug. A asserção usa `has(campo)` e
 — `get` devolveria null nos dois casos e passaria com o bug presente.
 
 **Placar:** core-java **410**, worker-python **104**, frontend-vue **40**.
+
+---
+
+### 2026-08-14 — 📅 Campo de data em dd/mm/aaaa
+
+Pedido do usuário: os campos de data mostravam `mm/dd/yyyy`.
+
+**Verifiquei antes de escolher a solução**, porque a resposta óbvia (`lang="pt-BR"`) já estava no
+`index.html` e não funcionava. Montei uma página de teste e fotografei no Chrome em inglês:
+
+| Tentativa | Resultado |
+|---|---|
+| `lang="pt-BR"` no `<html>` | `mm/dd/yyyy` |
+| `lang="pt-BR"` no próprio `<input>` | `mm/dd/yyyy` |
+| `showPicker()` disponível? | **sim** |
+
+O formato do `<input type="date">` é do **navegador**, e não da página. Não há atributo que
+sobreponha ([D-105](DECISOES.md)). A única saída é um campo próprio — e a terceira linha da
+tabela foi o que permitiu não pagar o preço de sempre.
+
+**O calendário não foi perdido.** Trocar por texto puro consertaria o formato quebrando a
+usabilidade, principalmente no celular. O botão abre o seletor nativo via `showPicker()`.
+
+#### Um teste que sumiu em silêncio
+
+Ao rodar a suite, o total continuou 53 — e os 11 testes do componente **não apareceram**. O
+`vitest.config.ts` não tinha o plugin do Vue: eu o criei assim, com o comentário *"os testes não
+precisam do plugin do Vue... o que testamos aqui é lógica pura"*. Era verdade na época e deixou de
+ser, e o arquivo `.vue` passou a ser **ignorado na coleta**.
+
+É a pior forma de um teste falhar: parecendo que não existe. Só percebi porque conferi a
+aritmética do total — 40 + 13 = 53, e não 64.
+
+#### Um teste meu que estava errado
+
+`data inexistente nao vira valor` esperava que digitar `31/02/2026` **não emitisse nada**. O
+código emitia `null`, e o código estava certo: com silêncio, o formulário ficaria com a data
+antiga enquanto a tela mostra outra, e salvar guardaria o valor velho achando que mudou. Corrigi a
+expectativa, e não o comportamento.
+
+**Placar:** core-java **410**, worker-python **104**, frontend-vue **64**.
