@@ -209,7 +209,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # `prometheus` entra na E4.3. Nao ha coletor apontado para ca ainda —
+        # ele existe para que, no dia do deploy, observabilidade seja
+        # configuracao de infraestrutura e nao mudanca de codigo.
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
@@ -217,5 +220,14 @@ management:
         enabled: true
 
 logging:
+  # Log estruturado em JSON quando LOG_FORMAT=ecs — etapa E4.3.
+  #
+  # Vazio por padrao, de proposito: JSON e otimo para uma ferramenta ler e
+  # ruim para uma pessoa ler, e no desenvolvimento quem le e uma pessoa. O
+  # docker-compose liga o formato nos containers, onde quem le e o coletor.
+  structured:
+    format:
+      console: ${LOG_FORMAT:}
+
   level:
     "[com.flightmonitor.core]": DEBUG

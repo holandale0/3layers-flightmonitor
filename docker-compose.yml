@@ -85,6 +85,10 @@ services:
 
       # Credenciais vem do .env da raiz, que o compose le sozinho. Elas NAO
       # entram na imagem: imagem e artefato compartilhavel, segredo nao.
+      # Log em JSON no container (E4.3): quem le aqui e um coletor, nao uma
+      # pessoa. No desenvolvimento fica vazio, e o log volta a ser legivel.
+      LOG_FORMAT: ${LOG_FORMAT:-ecs}
+
       NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-LOG}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}

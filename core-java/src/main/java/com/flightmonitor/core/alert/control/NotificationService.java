@@ -36,6 +36,7 @@ public class NotificationService {
     private final AlertRepository alertas;
     private final TransactionTemplate tx;
     private final NotificationProperties props;
+    private final MetricasDeEntrega metricas;
     private final Map<AlertChannel, NotificationChannel> canais = new EnumMap<>(AlertChannel.class);
 
     /**
@@ -54,10 +55,12 @@ public class NotificationService {
             AlertRepository alertas,
             TransactionTemplate tx,
             NotificationProperties props,
-            List<NotificationChannel> canaisDisponiveis) {
+            List<NotificationChannel> canaisDisponiveis,
+            MetricasDeEntrega metricas) {
         this.alertas = alertas;
         this.tx = tx;
         this.props = props;
+        this.metricas = metricas;
 
         for (NotificationChannel canal : canaisDisponiveis) {
             this.canais.put(canal.canal(), canal);
@@ -152,6 +155,8 @@ public class NotificationService {
             resultado = DeliveryResult.falhaTransitoria(
                     "excecao nao tratada: " + e.getClass().getSimpleName());
         }
+
+        metricas.registrar(canal.canal(), resultado);
 
         return finalizar(alertaId, resultado, assincrono);
     }

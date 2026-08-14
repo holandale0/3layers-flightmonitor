@@ -68,7 +68,7 @@
 |---|---|---|
 | E4.1 | RabbitMQ | ✅ concluída |
 | E4.2 | Dockerização completa | ✅ concluída |
-| E4.3 | Observabilidade | ⬜ pendente |
+| E4.3 | Observabilidade | ✅ concluída |
 | E4.4 | Deploy | ⬜ pendente |
 | E4.5 | **Canário ao vivo** das fontes | ⬜ pendente |
 | E4.6 | **Canal de e-mail** | ✅ concluída |
@@ -3194,3 +3194,67 @@ relação com o problema.
 **Verificado com os olhos, e não só pelo validador:** renderizei os quatro SVG em PNG com Chrome
 headless e olhei um por um. O validador do archify garante composição; ele não garante que o CSS
 sobreviveu à extração.
+
+---
+
+### 2026-08-14 — ✅ E4.3 concluída · Métricas que teriam pegado o bug que ninguém pegou
+
+Observabilidade tem um jeito fácil de sair errada: instrumentar CPU, memória e latência, montar
+um painel bonito e não enxergar nada do que importa. Este projeto tinha um caso concreto para
+usar de critério — o [BUG-014](BUGS.md) — e a pergunta virou: **quais métricas teriam pegado
+aquilo?**
+
+A camada 2 inteira ficou indisponível por **seis semanas**. CPU, memória, uptime e latência
+estavam perfeitos o tempo todo. Nenhum erro, nenhum log vermelho. O sistema simplesmente parou de
+alertar.
+
+O que teria pegado: `camada2.consultas{resultado="confirmou"}` **zerado** enquanto
+`busca.execucoes` continuava subindo. Por isso o que se mede aqui é **resultado de negócio**
+([D-101](DECISOES.md)):
+
+| Métrica | Responde |
+|---|---|
+| `busca.execucoes{desfecho}` | falhou, sem candidato, não confirmado, com oportunidade |
+| `busca.duracao` | quanto demora uma varredura completa |
+| `camada2.consultas{resultado}` | confirmou, recusou, ilusório, **indisponível** |
+| `alerta.decisoes{motivo,alertou}` | por que alertou, e por que não alertou |
+| `entrega.tentativas{canal,resultado}` | aceita, falha transitória, falha permanente |
+| `observacoes.gravadas` | o histórico está crescendo? |
+
+#### Duas decisões que mudam o que a métrica vale
+
+**Sem candidato não conta como "não confirmou".** Dia sem promoção é a maioria dos dias, e
+contá-los afogaria o sinal no ruído. A camada 2 só aparece quando foi de fato consultada — há
+teste garantindo.
+
+**Transitória e permanente separadas na entrega**, porque mudam o alarme: transitória subindo é a
+Meta instável e passa; permanente subindo é configuração errada e não passa sozinha.
+
+#### O teste que importa
+
+`MetricasDaBuscaTest.OSinalDoBug014` **reproduz a assinatura do bug** — dez varreduras com
+candidato e camada 2 degradada — e verifica que ela aparece: `indisponivel = 10`, `confirmou = 0`,
+e `busca.execucoes{falhou} = 0`, porque a busca continua "funcionando". Métrica que não pega o bug
+que motivou sua existência é decoração.
+
+#### Log: JSON para a ferramenta, texto para a pessoa
+
+`LOG_FORMAT` vazio no desenvolvimento e `ecs` no container ([D-102](DECISOES.md)). JSON é ótimo
+para uma ferramenta ler e ruim para uma pessoa ler — forçar um formato para os dois é escolher
+qual dos dois vai sofrer.
+
+#### Validado em container, com dados reais
+
+```
+flightmonitor_busca_execucoes_total{desfecho="com_oportunidade"} 1.0
+flightmonitor_camada2_consultas_total{resultado="confirmou"} 1.0
+flightmonitor_alerta_decisoes_total{alertou="true",motivo="alertado"} 1.0
+flightmonitor_entrega_tentativas_total{canal="email",resultado="aceita"} 1.0
+flightmonitor_observacoes_gravadas_total 2.0
+flightmonitor_busca_duracao_seconds_sum 3.551434873
+```
+
+`/actuator/prometheus` está exposto **sem coletor apontado para ele** — para que, no dia do
+deploy, observabilidade seja configuração de infraestrutura e não mudança de código.
+
+**Placar:** core-java **401**, worker-python **95**, frontend-vue **36**.

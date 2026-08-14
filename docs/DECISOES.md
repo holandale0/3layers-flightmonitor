@@ -1568,6 +1568,43 @@ veio resolver, disfarçado de otimização.
 **Uma linha, e só uma** (`CHECK (id = 1)`). O sistema é pessoal e fala por um número só; várias
 linhas criariam a pergunta "qual vale?", que não tem resposta boa.
 
+### D-101 · Mede-se resultado de negócio, e não saúde de processo ✅
+**Decisão:** as métricas da E4.3 contam **varreduras, confirmações, decisões e entregas** — e
+não CPU, memória ou latência de endpoint.
+
+**Por quê:** o [BUG-014](BUGS.md) definiu o que precisava ser medido. A camada 2 inteira ficou
+indisponível por **seis semanas** e nenhuma métrica de infraestrutura teria percebido: CPU,
+memória, uptime e latência estavam perfeitos. Não houve erro, não houve log vermelho — a cadeia
+de providers trata fonte ausente como degradação, que é o comportamento certo para uma fonte
+frágil, e o sintoma foi o sistema **parar de alertar em silêncio**.
+
+O que teria pegado é `camada2.consultas{resultado="confirmou"}` zerado enquanto
+`busca.execucoes` continuava subindo. A pergunta que estas métricas respondem é *"o sistema
+ainda está fazendo o que promete?"*, que é diferente de *"o sistema está no ar?"*.
+
+**Sem candidato não conta como "não confirmou".** Dia sem promoção é a maioria dos dias; contar
+isso afogaria o sinal de verdade no ruído. A camada 2 só é medida quando foi realmente consultada.
+
+**Transitória e permanente são rótulos separados na entrega**, porque mudam o alarme e não só o
+código: falha transitória subindo é a Meta instável, e passa; falha permanente subindo é
+configuração errada, e não passa sozinha. A primeira dá para dormir; a segunda, não.
+
+**Prometheus exposto sem coletor apontado para ele.** Não é antecipação vazia: é o que faz
+observabilidade, no dia do deploy (E4.4), ser configuração de infraestrutura em vez de mudança
+de código.
+
+### D-102 · JSON no container, texto na máquina ✅
+**Decisão:** `logging.structured.format.console` vem de `${LOG_FORMAT:}` — vazio por padrão, e
+`ecs` nos containers via `docker-compose.yml`.
+
+**Por quê:** JSON é ótimo para uma **ferramenta** ler e ruim para uma **pessoa** ler. No
+desenvolvimento quem lê é uma pessoa; no container, um coletor. Forçar um formato para os dois
+significa escolher qual dos dois vai sofrer.
+
+O formato é **ECS** (Elastic Common Schema) porque ele já traz `service.name`, `service.version`,
+`process.thread.name` e `log.logger` com nomes que as ferramentas conhecem — log estruturado com
+chave inventada dá o trabalho de estruturar sem a vantagem de ser lido.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

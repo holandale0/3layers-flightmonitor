@@ -301,7 +301,7 @@ marcada como concluída em [PROGRESSO.md](PROGRESSO.md).
 |---|---|---|
 | **E4.1** | RabbitMQ substituindo REST síncrono | ✅ adaptador AMQP atrás da mesma porta `SearchClient`, escolhido por configuração. Os 11 testes do E2E entre serviços rodam nos **dois** transportes. [D-087](DECISOES.md) |
 | **E4.2** | Dockerização completa dos 3 serviços | ✅ `docker compose up` sobe os 5 containers. Banco `flightmon_test` separado fecha o [RISCO-008](BUGS.md). Ciclo completo validado em container, nos **dois** transportes |
-| **E4.3** | Observabilidade | Logs estruturados, métricas de busca, taxa de falha por provider |
+| **E4.3** | Observabilidade | ✅ log ECS em JSON no container, métricas de negócio em `/actuator/prometheus`, e o sinal que teria pegado o [BUG-014](BUGS.md). [D-101](DECISOES.md) · [D-102](DECISOES.md) |
 | **E4.4** | Deploy | Ambiente rodando de forma contínua |
 | **E4.5** | **Canário ao vivo** das fontes externas | Rotina agendada consulta as APIs reais e avisa quando o formato mudar |
 | **E4.7** | **Configuração do canal por tela** | ✅ `phone_number_id`, `waba_id`, template e idioma no banco, editáveis sem reiniciar. Segredos seguem no ambiente. [D-100](DECISOES.md) |

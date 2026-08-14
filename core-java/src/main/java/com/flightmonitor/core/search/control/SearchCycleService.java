@@ -1,6 +1,7 @@
 package com.flightmonitor.core.search.control;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -51,6 +52,7 @@ public class SearchCycleService {
     private final NotificationService notificacao;
     private final TransactionTemplate tx;
     private final SchedulerProperties props;
+    private final MetricasDaBusca metricas;
 
     public SearchCycleService(
             MonitorRepository monitores,
@@ -58,13 +60,15 @@ public class SearchCycleService {
             AlertService alertas,
             NotificationService notificacao,
             TransactionTemplate tx,
-            SchedulerProperties props) {
+            SchedulerProperties props,
+            MetricasDaBusca metricas) {
         this.monitores = monitores;
         this.busca = busca;
         this.alertas = alertas;
         this.notificacao = notificacao;
         this.tx = tx;
         this.props = props;
+        this.metricas = metricas;
     }
 
     public CycleResult executarCiclo() {
@@ -119,26 +123,36 @@ public class SearchCycleService {
      * impede que isso volte a acontecer.
      */
     public MonitorRunResult processarMonitor(Long monitorId) {
+        // Medido AQUI porque este e o unico ponto de entrada da varredura — a
+        // mesma propriedade que impede alerta de ser esquecido impede metrica
+        // de ficar cega num caminho alternativo.
+        long inicio = System.nanoTime();
         SearchOutcome resultado;
         try {
             resultado = busca.varrer(monitorId);
         } finally {
             marcarBuscaFeita(monitorId);
         }
+        // Fora do `finally`: se `varrer` lancar, nao ha resultado para
+        // classificar, e inventar um desfecho seria pior que nao ter a medida.
+        metricas.registrar(resultado, Duration.ofNanos(System.nanoTime() - inicio));
 
         if (resultado.falhou()) {
             reagendarParaRetentativa(monitorId);
+            metricas.registrarDecisao(AlertDecision.Motivo.SEM_OPORTUNIDADE.name(), false);
             return new MonitorRunResult(resultado, AlertDecision.naoAlertar(
                     AlertDecision.Motivo.SEM_OPORTUNIDADE, "a varredura falhou"));
         }
 
         if (!resultado.temOportunidade()) {
+            metricas.registrarDecisao(AlertDecision.Motivo.SEM_OPORTUNIDADE.name(), false);
             return new MonitorRunResult(resultado, AlertDecision.naoAlertar(
                     AlertDecision.Motivo.SEM_OPORTUNIDADE,
                     "nenhuma oferta abaixo do teto que se sustentasse"));
         }
 
         AlertDecision decisao = alertas.avaliar(resultado);
+        metricas.registrarDecisao(decisao.motivo().name(), decisao.alertar());
 
         if (decisao.alertar()) {
             log.info("monitor {}: ALERTA a {} - {}",
