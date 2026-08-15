@@ -1,6 +1,6 @@
 # Flight Monitor — Monitor de Preços de Passagens Aéreas
 
-**Sistema distribuído que vigia rotas aéreas em background e avisa no WhatsApp ou e-mail quando encontra uma oferta dentro do seu preço-teto — com análise estatística que sabe quando calar a boca.**
+**Sistema distribuído que vigia rotas aéreas em background e avisa no WhatsApp ou e-mail quando encontra uma oferta dentro do seu preço-teto — com análise estatística e decisão sobre quando realmente notificar.**
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk)](https://openjdk.org)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
