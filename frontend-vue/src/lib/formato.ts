@@ -70,3 +70,23 @@ export function dataCurta(iso: string): string {
 export function instante(iso: string | null | undefined): string {
   return iso ? new Date(iso).toLocaleString(LOCAL) : '—'
 }
+
+/**
+ * Minutos de voo em algo que se lê: `990` → `16h30`.
+ *
+ * Horas e minutos, e não "990 min": ninguém pensa em duração de viagem em
+ * minutos, e converter de cabeça é trabalho que a tela devia poupar.
+ *
+ * Nulo vira travessão, e não `0h00` — nem toda fonte informa duração, e não
+ * saber é diferente de durar zero.
+ */
+export function duracao(minutos: number | null | undefined): string {
+  if (minutos === null || minutos === undefined || minutos <= 0) {
+    return '—'
+  }
+  const horas = Math.floor(minutos / 60)
+  const resto = minutos % 60
+
+  if (horas === 0) return `${resto}min`
+  return resto === 0 ? `${horas}h` : `${horas}h${String(resto).padStart(2, '0')}`
+}

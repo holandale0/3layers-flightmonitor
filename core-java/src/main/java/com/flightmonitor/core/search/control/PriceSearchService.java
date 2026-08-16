@@ -257,6 +257,7 @@ public class PriceSearchService {
         o.setCurrency(oferta.currency() != null ? oferta.currency() : monitor.getCurrency());
         o.setAirline(oferta.airline());
         o.setStops(oferta.stops());
+        o.setDurationMinutes(oferta.durationMinutes());
         o.setDepartureAt(oferta.departureAt());
         o.setArrivalAt(oferta.arrivalAt());
         // Preco de cidade, vindo de cache: nao e confirmado por definicao.

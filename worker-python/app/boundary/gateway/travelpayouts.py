@@ -123,6 +123,9 @@ def _para_oferta(dia: str, bruto: dict[str, Any], moeda: str) -> FlightOffer | N
         airline=bruto.get("airline"),
         flight_number=str(numero) if numero is not None else None,
         stops=bruto.get("transfers"),
+        # Este endpoint nao informa duracao. Nulo diz isso; qualquer numero
+        # inventado aqui apareceria na tela como fato.
+        duration_minutes=None,
         departure_at=_horario_local(bruto.get("departure_at")),
         # Este endpoint NAO devolve horario de chegada. A primeira versao punha
         # `return_at` aqui — que e a partida da VOLTA, e nao a chegada da ida.
@@ -131,6 +134,19 @@ def _para_oferta(dia: str, bruto: dict[str, Any], moeda: str) -> FlightOffer | N
         expires_at=_instante(bruto.get("expires_at")),
         source=SOURCE,
     )
+
+
+def _inteiro_positivo(valor: Any) -> int | None:
+    """Minutos so valem se forem um numero positivo.
+
+    Zero ou negativo nao e "duracao desconhecida", e dado quebrado — e mostrar
+    "0h00" na tela seria pior que mostrar nada.
+    """
+    try:
+        n = int(valor)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
 
 
 def _para_oferta_so_ida(bruto: dict[str, Any], moeda: str) -> FlightOffer | None:
@@ -155,9 +171,14 @@ def _para_oferta_so_ida(bruto: dict[str, Any], moeda: str) -> FlightOffer | None
         return_date=None,
         price=preco,
         currency=moeda,
-        airline=bruto.get("gate"),
+        # `gate` e a AGENCIA (Kiwi.com, Mytrip.com), e nao a companhia aerea —
+        # e este endpoint nao informa a companhia. A primeira versao punha o
+        # `gate` aqui, e a tela mostrava "Companhia: Kiwi.com", que e falso.
+        # Nulo diz que nao se sabe, que e a verdade.
+        airline=None,
         flight_number=None,
         stops=bruto.get("number_of_changes"),
+        duration_minutes=_inteiro_positivo(bruto.get("duration")),
         departure_at=None,
         arrival_at=None,
         expires_at=None,

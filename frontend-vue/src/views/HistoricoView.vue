@@ -5,7 +5,7 @@ import { buscarMonitor } from '@/api/monitores'
 import { listarObservacoes } from '@/api/observacoes'
 import GraficoPrecos from '@/components/GraficoPrecos.vue'
 import { useCarregamento } from '@/composables/useCarregamento'
-import { data, dinheiro, instante } from '@/lib/formato'
+import { data, dinheiro, duracao, instante } from '@/lib/formato'
 import type { Monitor } from '@/model/monitor'
 import type { Observacao } from '@/model/observacao'
 import { menorPrecoPorData } from '@/model/observacao'
@@ -107,6 +107,7 @@ onMounted(executar)
                 <th class="num">Preço</th>
                 <th>Companhia</th>
                 <th class="num">Escalas</th>
+                <th class="num">Duração</th>
                 <th>Fonte</th>
                 <th>Observado em</th>
               </tr>
@@ -120,6 +121,7 @@ onMounted(executar)
                 </td>
                 <td>{{ o.airline || '—' }}</td>
                 <td class="num">{{ o.stops ?? '—' }}</td>
+                <td class="num">{{ duracao(o.durationMinutes) }}</td>
                 <td>
                   <span class="fonte" :class="o.confirmed ? 'confirmada' : ''">
                     {{ o.source === 'FAST_FLIGHTS' ? 'confirmado' : 'cache' }}

@@ -126,7 +126,7 @@ class SearchCycleServiceTest {
         LocalDate ida = LocalDate.now().plusMonths(6).plusDays(1);
         WorkerFlightOffer o = new WorkerFlightOffer(
                 ida, ida.plusDays(12), new BigDecimal(preco), "BRL",
-                "TAP", "1234", (short) 0, null, null, null, "TRAVELPAYOUTS");
+                "TAP", "1234", (short) 0, 630, null, null, null, "TRAVELPAYOUTS");
         return new CalendarSearchResult("GRU", "LIS", List.of(o), 1, 1, "SAO", "LIS", List.of());
     }
 

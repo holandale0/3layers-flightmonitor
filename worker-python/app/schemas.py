@@ -49,6 +49,10 @@ class FlightOffer(BaseModel):
     airline: str | None = None
     flight_number: str | None = None
     stops: int | None = None
+    # Duracao total da viagem, em minutos. Nem toda fonte informa: o calendario
+    # de ida e volta nao traz, o endpoint de so ida traz. Nulo quando a fonte
+    # nao diz — e nao zero, que significaria voo instantaneo.
+    duration_minutes: int | None = None
     # Horario local do aeroporto, sem fuso — coerente com o schema do banco.
     departure_at: datetime | None = None
     arrival_at: datetime | None = None

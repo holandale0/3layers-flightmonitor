@@ -18,6 +18,8 @@ public record WorkerFlightOffer(
         String airline,
         String flightNumber,
         Short stops,
+        // Duracao total da viagem, em minutos. Nem toda fonte informa.
+        Integer durationMinutes,
         // Horario local do aeroporto — sem fuso, coerente com o schema do banco.
         LocalDateTime departureAt,
         LocalDateTime arrivalAt,

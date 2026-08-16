@@ -1734,6 +1734,43 @@ eram imprecisos, eram de outro produto.
 descartada de qualquer forma. O bug nasceu exatamente de confiar numa promessa da fonte sem
 conferir; a correção não repete o erro.
 
+### D-108 · Agência não é companhia aérea ✅
+**Decisão:** no caminho de somente ida, `airline` fica **nulo**. O `gate` da Travelpayouts
+(`Kiwi.com`, `Mytrip.com`) é a **agência que vende**, e não quem opera o voo — e esse endpoint
+não informa a companhia.
+
+**Por quê:** a primeira versão da correção do [BUG-016](BUGS.md) pôs o `gate` no campo `airline`,
+e a tela passou a mostrar **"Companhia: Kiwi.com"**. É falso, e do pior tipo: plausível o
+suficiente para ninguém desconfiar. Quem lesse escolheria voo pensando em companhia aérea.
+
+Nulo diz que não se sabe, que é a verdade — o mesmo princípio de `SEM_DADOS ≠ NORMAL`.
+
+**O custo, assumido:** o monitor de só ida perde a informação de companhia, que o calendário de
+ida e volta traz. Os dois endpoints informam coisas diferentes:
+
+| | Companhia | Duração |
+|---|---|---|
+| `v1/prices/calendar` (ida e volta) | ✅ | ❌ |
+| `v2/prices/latest` (só ida) | ❌ | ✅ |
+
+A agência continua disponível na fonte e não está modelada: acrescentá-la seria coluna nova no
+banco, campo novo em três DTOs e outra coluna na tabela — e ela responde "onde comprar", que é
+outra pergunta. Fica registrado como escolha, e não como esquecimento.
+
+### D-109 · Duração em horas, e travessão quando não se sabe ✅
+**Decisão:** a duração total aparece na tabela de observações como `7h05` / `16h30`; ausente vira
+`—`.
+
+**Por quê:** ninguém pensa em duração de viagem em minutos, e converter 990 de cabeça é trabalho
+que a tela devia poupar.
+
+**Zero e negativo também viram travessão**, e não `0h00`: duração zero não é "voo instantâneo",
+é dado quebrado. Mostrar `0h00` afirmaria uma inverdade; o travessão admite que não se sabe.
+
+**A coluna paga por si.** No primeiro dado real da rota CGH → BEL ela já mostrou o que o preço
+sozinho escondia: o voo **mais barato** (R$ 1.306) leva **16h30 com 2 escalas**, e o de R$ 1.383
+leva **7h05 com 1**. Setenta e sete reais separando sete horas de viagem.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

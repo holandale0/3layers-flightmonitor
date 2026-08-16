@@ -207,3 +207,49 @@ este mesmo monitor teria gravado R$ 1.674 com volta em 14/12.
 agora ter observações de só ida e de ida e volta misturadas — a consulta filtra por origem,
 destino, período e confirmação, e nada mais. Antes do BUG-016 isso não existia, porque tudo era
 ida e volta. Aguardando decisão.
+
+---
+
+### 2026-08-16 — ⏱️ Duração do voo na tabela — e uma companhia que era agência
+
+Pedido do usuário: mostrar a duração total do voo.
+
+**Meio caminho já existia.** A coluna `duration_minutes` está no banco desde a V1, o
+`ObservationResponse` já a expõe, e o tipo do frontend já a declara — a camada 2 sempre a
+gravou. Só a camada 1 perdia o dado no meio do caminho. **Nenhuma migration foi necessária.**
+
+O endpoint de só ida informa `duration` em minutos; o calendário de ida e volta não informa. Onde
+a fonte não diz, o campo fica nulo ([D-109](DECISOES.md)).
+
+**A coluna pagou por si no primeiro dado real:**
+
+```
+19/12/2026   R$ 1.383,00   1 escala    7h05
+20/12/2026   R$ 1.306,00   2 escalas  16h30
+```
+
+Setenta e sete reais separando **sete horas** de viagem — exatamente o que o preço sozinho
+escondia.
+
+#### E olhando a tela, achei outra coisa
+
+A coluna **Companhia** mostrava `Kiwi.com` e `Mytrip.com`. **Não são companhias aéreas, são
+agências** — e o erro era meu, da correção do [BUG-016](BUGS.md) de ontem: o campo `gate` da
+Travelpayouts foi parar em `airline`.
+
+É o pior tipo de dado errado: plausível o bastante para ninguém desconfiar. Quem lesse escolheria
+voo pensando em companhia aérea.
+
+Agora fica nulo ([D-108](DECISOES.md)) — este endpoint não informa a companhia, e dizer isso é
+melhor que preencher com outra coisa. Os dois endpoints informam metades diferentes:
+
+| | Companhia | Duração |
+|---|---|---|
+| `v1/prices/calendar` (ida e volta) | ✅ | ❌ |
+| `v2/prices/latest` (só ida) | ❌ | ✅ |
+
+**Dois testes existentes quebraram** ao acrescentar o componente no `WorkerFlightOffer` —
+construíam o record posicionalmente. Ajustados, e ganharam uma duração plausível em vez de mais
+um `null`.
+
+**Placar:** core-java **414**, worker-python **114**, frontend-vue **69**.

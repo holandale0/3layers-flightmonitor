@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { data, dataCurta, dinheiro, instante } from '@/lib/formato'
+import { data, dataCurta, dinheiro, duracao, instante } from '@/lib/formato'
 
 /**
  * Estas funcoes existiam em triplicata antes da reorganizacao, e as copias ja
@@ -61,5 +61,33 @@ describe('instante', () => {
     // que saia data E hora, e nao a data crua do ISO.
     const texto = instante('2026-03-15T14:30:00Z')
     expect(texto).toMatch(/^\d{2}\/\d{2}\/\d{4},? \d{2}:\d{2}:\d{2}$/)
+  })
+})
+
+describe('duracao', () => {
+  it('converte minutos em horas e minutos', () => {
+    // Ninguem pensa em duracao de viagem em minutos.
+    expect(duracao(990)).toBe('16h30')
+    expect(duracao(425)).toBe('7h05')
+  })
+
+  it('hora cheia nao mostra os minutos', () => {
+    expect(duracao(120)).toBe('2h')
+  })
+
+  it('menos de uma hora fica em minutos', () => {
+    expect(duracao(45)).toBe('45min')
+  })
+
+  it('sem duracao vira travessao, e nao 0h00', () => {
+    // O calendario de ida e volta nao informa duracao. Nao saber e diferente
+    // de durar zero.
+    expect(duracao(null)).toBe('—')
+    expect(duracao(undefined)).toBe('—')
+    expect(duracao(0)).toBe('—')
+  })
+
+  it('valor quebrado nao vira duracao negativa na tela', () => {
+    expect(duracao(-30)).toBe('—')
   })
 })

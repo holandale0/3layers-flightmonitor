@@ -52,7 +52,7 @@ def pedido_so_ida(**extra) -> CalendarSearchRequest:
     return CalendarSearchRequest(**base)
 
 
-def entrada(depart="2026-12-19", volta="", preco=1004, escalas=0):
+def entrada(depart="2026-12-19", volta="", preco=1004, escalas=0, duracao=425, gate="Kiwi.com"):
     """Uma entrada do `v2/prices/latest`, no formato real da API."""
     return {
         "origin": "SAO",
@@ -61,7 +61,8 @@ def entrada(depart="2026-12-19", volta="", preco=1004, escalas=0):
         "return_date": volta,
         "value": preco,
         "number_of_changes": escalas,
-        "gate": "LA",
+        "duration": duracao,
+        "gate": gate,
         "trip_class": 0,
     }
 
@@ -190,3 +191,46 @@ async def test_sem_horario_de_chegada_o_campo_fica_nulo():
     r = await provider.buscar(pedido_so_ida(), cliente=cliente)
 
     assert r.offers[0].arrival_at is None
+
+
+# ------------------------------------------------------ duracao e companhia
+
+
+@pytest.mark.anyio
+async def test_duracao_do_voo_vem_da_fonte():
+    # O endpoint de so ida informa `duration` em minutos. E a unica das duas
+    # fontes da camada 1 que informa.
+    cliente = ClienteFalso([entrada(duracao=990)])
+    provider = TravelpayoutsProvider(token="t")
+
+    r = await provider.buscar(pedido_so_ida(), cliente=cliente)
+
+    assert r.offers[0].duration_minutes == 990
+
+
+@pytest.mark.anyio
+async def test_duracao_invalida_vira_nulo():
+    """Zero nao e "voo instantaneo", e dado quebrado.
+
+    Mostrar "0h00" na tela seria pior que mostrar travessao: um diz uma
+    inverdade, o outro admite que nao se sabe.
+    """
+    for ruim in (0, -30, None, "muito tempo"):
+        cliente = ClienteFalso([entrada(duracao=ruim)])
+        r = await TravelpayoutsProvider(token="t").buscar(pedido_so_ida(), cliente=cliente)
+        assert r.offers[0].duration_minutes is None, ruim
+
+
+@pytest.mark.anyio
+async def test_agencia_nao_e_companhia_aerea():
+    """`gate` e a AGENCIA, e nao quem opera o voo.
+
+    A primeira versao da correcao do BUG-016 punha o `gate` no campo
+    `airline`, e a tela mostrava "Companhia: Kiwi.com" — que e falso. Este
+    endpoint nao informa a companhia; nulo diz isso.
+    """
+    cliente = ClienteFalso([entrada(gate="Mytrip.com")])
+
+    r = await TravelpayoutsProvider(token="t").buscar(pedido_so_ida(), cliente=cliente)
+
+    assert r.offers[0].airline is None
