@@ -16,6 +16,9 @@ public record WorkerFlightOffer(
         BigDecimal price,
         String currency,
         String airline,
+        // Quem VENDE. Nunca deve cair em `airline`: aquele campo e comparado
+        // com as companhias evitadas do monitor.
+        String agency,
         String flightNumber,
         Short stops,
         // Duracao total da viagem, em minutos. Nem toda fonte informa.

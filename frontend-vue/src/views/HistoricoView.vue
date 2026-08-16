@@ -8,7 +8,7 @@ import { useCarregamento } from '@/composables/useCarregamento'
 import { data, dinheiro, duracao, instante } from '@/lib/formato'
 import type { Monitor } from '@/model/monitor'
 import type { Observacao } from '@/model/observacao'
-import { menorPrecoPorData } from '@/model/observacao'
+import { menorPrecoPorData, ondeComprar } from '@/model/observacao'
 
 const props = defineProps<{ id: string }>()
 
@@ -105,7 +105,7 @@ onMounted(executar)
                 <th>Ida</th>
                 <th>Volta</th>
                 <th class="num">Preço</th>
-                <th>Companhia</th>
+                <th>Companhia / Agência</th>
                 <th class="num">Escalas</th>
                 <th class="num">Duração</th>
                 <th>Fonte</th>
@@ -119,7 +119,13 @@ onMounted(executar)
                 <td class="num" :class="{ cabe: o.price <= monitor.maxPrice }">
                   {{ dinheiro(o.price, o.currency) }}
                 </td>
-                <td>{{ o.airline || '—' }}</td>
+                <td>
+                  <template v-if="ondeComprar(o)">
+                    {{ ondeComprar(o)!.valor }}
+                    <span class="tipo">{{ ondeComprar(o)!.tipo }}</span>
+                  </template>
+                  <template v-else>—</template>
+                </td>
                 <td class="num">{{ o.stops ?? '—' }}</td>
                 <td class="num">{{ duracao(o.durationMinutes) }}</td>
                 <td>
@@ -262,6 +268,13 @@ td.cabe {
 .instante {
   color: var(--texto-suave);
   font-size: 0.8rem;
+}
+
+/* Diz se o nome ao lado e quem voa ou quem vende — sem custar uma coluna. */
+.tipo {
+  color: var(--texto-suave);
+  font-size: 0.7rem;
+  margin-left: 0.3rem;
 }
 
 .msg {

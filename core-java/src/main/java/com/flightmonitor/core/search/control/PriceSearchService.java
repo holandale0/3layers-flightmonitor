@@ -256,6 +256,7 @@ public class PriceSearchService {
         o.setReturnDate(oferta.returnDate());
         o.setCurrency(oferta.currency() != null ? oferta.currency() : monitor.getCurrency());
         o.setAirline(oferta.airline());
+        o.setAgency(oferta.agency());
         o.setStops(oferta.stops());
         o.setDurationMinutes(oferta.durationMinutes());
         o.setDepartureAt(oferta.departureAt());

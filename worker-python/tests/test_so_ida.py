@@ -222,15 +222,42 @@ async def test_duracao_invalida_vira_nulo():
 
 
 @pytest.mark.anyio
-async def test_agencia_nao_e_companhia_aerea():
-    """`gate` e a AGENCIA, e nao quem opera o voo.
+async def test_agencia_vai_para_campo_proprio_e_nao_para_companhia():
+    """`gate` e quem VENDE, e nao quem opera o voo.
 
-    A primeira versao da correcao do BUG-016 punha o `gate` no campo
-    `airline`, e a tela mostrava "Companhia: Kiwi.com" — que e falso. Este
-    endpoint nao informa a companhia; nulo diz isso.
+    As duas coisas ficam separadas por um motivo que vai alem da tela: o core
+    compara `airline` com a lista de companhias que o monitor evita. Agencia
+    naquele campo faria "evitar GOL" comparar GOL com Kiwi.com — e a
+    preferencia pararia de funcionar em silencio.
     """
     cliente = ClienteFalso([entrada(gate="Mytrip.com")])
 
     r = await TravelpayoutsProvider(token="t").buscar(pedido_so_ida(), cliente=cliente)
 
     assert r.offers[0].airline is None
+    assert r.offers[0].agency == "Mytrip.com"
+
+
+@pytest.mark.anyio
+async def test_a_referencia_para_comprar_nunca_se_perde():
+    """O motivo de a agencia ser guardada, e nao descartada.
+
+    Sem nenhum dos dois campos, a tabela mostraria travessao — e quem visse a
+    oferta nao teria onde ir compra-la. Guardar em campo proprio mantem a
+    informacao util sem misturar significados.
+    """
+    cliente = ClienteFalso([entrada(gate="Kiwi.com")])
+
+    r = await TravelpayoutsProvider(token="t").buscar(pedido_so_ida(), cliente=cliente)
+    oferta = r.offers[0]
+
+    assert (oferta.airline or oferta.agency) is not None
+
+
+@pytest.mark.anyio
+async def test_gate_vazio_nao_vira_agencia_em_branco():
+    cliente = ClienteFalso([entrada(gate="")])
+
+    r = await TravelpayoutsProvider(token="t").buscar(pedido_so_ida(), cliente=cliente)
+
+    assert r.offers[0].agency is None

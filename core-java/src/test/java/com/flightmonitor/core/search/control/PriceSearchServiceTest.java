@@ -142,7 +142,7 @@ class PriceSearchServiceTest {
         LocalDate ida = LocalDate.now().plusMonths(6).plusDays(diaDoMes);
         return new WorkerFlightOffer(
                 ida, ida.plusDays(12), new BigDecimal(preco), "BRL",
-                "TAP", "1234", (short) 0, 630,
+                "TAP", null, "1234", (short) 0, 630,
                 LocalDateTime.of(ida, java.time.LocalTime.of(22, 30)),
                 null, null, "TRAVELPAYOUTS");
     }

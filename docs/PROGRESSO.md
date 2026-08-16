@@ -253,3 +253,41 @@ construíam o record posicionalmente. Ajustados, e ganharam uma duração plaus�
 um `null`.
 
 **Placar:** core-java **414**, worker-python **114**, frontend-vue **69**.
+
+---
+
+### 2026-08-16 — 🏪 A agência volta — em campo próprio, e na mesma coluna da tela
+
+O usuário questionou a decisão anterior: *"ao invés de simplesmente deixar de mostrar a agência,
+não seria melhor renomear o campo? Se estiver vazio, não haverá referência para eu ir buscar a
+passagem e comprar."*
+
+**Estava certo.** Eu tinha corrigido a mentira ("Companhia: Kiwi.com") esvaziando o campo, e com
+isso tirei a informação que permite **agir**. Um monitor que encontra a oferta e não diz onde
+comprá-la resolve metade do problema.
+
+**Mas renomear a coluna e guardar as duas coisas juntas quebraria uma regra**, e não só a
+estética — verifiquei antes de responder: `Preferencias.companhiaEvitada()` compara `airline` com
+a lista de companhias que o monitor evita. Com "Kiwi.com" ali, quem pediu *"evitar GOL"* passaria
+a comparar GOL com Kiwi.com, e a preferência pararia de funcionar **em silêncio**.
+
+A saída atende os dois lados ([D-110](DECISOES.md)): **separadas no dado, juntas na tela.**
+
+```
+Companhia / Agência
+Kiwi.com    agência
+Mytrip.com  agência
+LATAM       companhia
+```
+
+Uma coluna — porque quem lê quer responder "onde compro isso?" — com o rótulo dizendo qual das
+duas é. O código precisa distinguir; o leitor, não.
+
+**Migration V10**, aditiva. A companhia tem precedência quando as duas existem: quem opera o voo
+informa mais que quem intermediou a venda.
+
+**Dois testes posicionais quebraram de novo** ao acrescentar o componente no `WorkerFlightOffer` —
+pela segunda vez no mesmo dia. Um record com onze componentes construído por posição é frágil por
+natureza; anotado como incomodo, não como bug.
+
+**Placar:** core-java **414**, worker-python **116**, frontend-vue **74**.

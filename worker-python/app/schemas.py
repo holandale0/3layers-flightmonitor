@@ -47,6 +47,11 @@ class FlightOffer(BaseModel):
     price: Decimal
     currency: str
     airline: str | None = None
+    # Quem VENDE a passagem (Kiwi.com, Mytrip.com), e nao quem opera o voo.
+    # Separado de `airline` porque o core compara `airline` com a lista de
+    # companhias evitadas do monitor: agencia ali faria a preferencia parar de
+    # funcionar em silencio. Ver V10.
+    agency: str | None = None
     flight_number: str | None = None
     stops: int | None = None
     # Duracao total da viagem, em minutos. Nem toda fonte informa: o calendario

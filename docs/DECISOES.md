@@ -1734,7 +1734,7 @@ eram imprecisos, eram de outro produto.
 descartada de qualquer forma. O bug nasceu exatamente de confiar numa promessa da fonte sem
 conferir; a correção não repete o erro.
 
-### D-108 · Agência não é companhia aérea ✅
+### D-108 · Agência não é companhia aérea ✅ *(refinada pela [D-110](DECISOES.md))*
 **Decisão:** no caminho de somente ida, `airline` fica **nulo**. O `gate` da Travelpayouts
 (`Kiwi.com`, `Mytrip.com`) é a **agência que vende**, e não quem opera o voo — e esse endpoint
 não informa a companhia.
@@ -1753,9 +1753,10 @@ ida e volta traz. Os dois endpoints informam coisas diferentes:
 | `v1/prices/calendar` (ida e volta) | ✅ | ❌ |
 | `v2/prices/latest` (só ida) | ❌ | ✅ |
 
-A agência continua disponível na fonte e não está modelada: acrescentá-la seria coluna nova no
-banco, campo novo em três DTOs e outra coluna na tabela — e ela responde "onde comprar", que é
-outra pergunta. Fica registrado como escolha, e não como esquecimento.
+**Esta parte foi revista no mesmo dia.** Eu havia deixado a agência fora do modelo, argumentando
+que "onde comprar" era outra pergunta. O usuário apontou o furo: com o campo vazio, **não há
+referência para ir comprar a passagem** — e um monitor que encontra oferta sem dizer onde
+comprá-la resolve metade do problema. A agência passou a ser modelada na [D-110](DECISOES.md).
 
 ### D-109 · Duração em horas, e travessão quando não se sabe ✅
 **Decisão:** a duração total aparece na tabela de observações como `7h05` / `16h30`; ausente vira
@@ -1770,6 +1771,33 @@ que a tela devia poupar.
 **A coluna paga por si.** No primeiro dado real da rota CGH → BEL ela já mostrou o que o preço
 sozinho escondia: o voo **mais barato** (R$ 1.306) leva **16h30 com 2 escalas**, e o de R$ 1.383
 leva **7h05 com 1**. Setenta e sete reais separando sete horas de viagem.
+
+### D-110 · Separadas no dado, juntas na tela ✅
+**Decisão:** `price_observation` ganha a coluna `agency` (V10). Na tabela de observações as duas
+aparecem numa **única coluna "Companhia / Agência"**, com um rótulo dizendo qual das duas é.
+
+**Por quê:** o usuário apontou que deixar o campo vazio tira a informação que permite **agir** —
+sem saber onde comprar, encontrar a oferta não serve para nada. Estava certo.
+
+**Mas juntar as duas numa coluna só no banco quebraria uma regra**, e não só a estética:
+`Preferencias.companhiaEvitada()` compara `airline` com a lista de companhias que o monitor
+evita. Com "Kiwi.com" ali, quem pediu *"evitar GOL"* passaria a comparar GOL com Kiwi.com — e a
+preferência **pararia de funcionar em silêncio**, que é a pior forma de uma regra falhar.
+
+Daí a divisão: **o código precisa distinguir; o leitor não**. Quem olha a tabela quer responder
+"onde eu compro isso?", e uma coluna basta. O rótulo (`agência`) evita que o nome seja lido como
+companhia — que foi exatamente o erro que a separação veio corrigir.
+
+**A companhia tem precedência** quando as duas existem: quem opera o voo informa mais do que quem
+intermediou a venda.
+
+**As fontes sabem metades diferentes**, e por isso as duas colunas são necessárias:
+
+| | Companhia | Agência | Duração |
+|---|---|---|---|
+| `v1/prices/calendar` (ida e volta) | ✅ | ❌ | ❌ |
+| `v2/prices/latest` (só ida) | ❌ | ✅ | ✅ |
+| fast-flights (camada 2) | ✅ | ❌ | ✅ |
 
 ## Decisões pendentes
 

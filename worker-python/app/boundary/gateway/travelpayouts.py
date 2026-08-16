@@ -121,6 +121,8 @@ def _para_oferta(dia: str, bruto: dict[str, Any], moeda: str) -> FlightOffer | N
         price=preco,
         currency=moeda,
         airline=bruto.get("airline"),
+        # O calendario diz a companhia e nao diz a agencia.
+        agency=None,
         flight_number=str(numero) if numero is not None else None,
         stops=bruto.get("transfers"),
         # Este endpoint nao informa duracao. Nulo diz isso; qualquer numero
@@ -171,11 +173,12 @@ def _para_oferta_so_ida(bruto: dict[str, Any], moeda: str) -> FlightOffer | None
         return_date=None,
         price=preco,
         currency=moeda,
-        # `gate` e a AGENCIA (Kiwi.com, Mytrip.com), e nao a companhia aerea —
-        # e este endpoint nao informa a companhia. A primeira versao punha o
-        # `gate` aqui, e a tela mostrava "Companhia: Kiwi.com", que e falso.
-        # Nulo diz que nao se sabe, que e a verdade.
+        # Este endpoint nao informa quem OPERA o voo.
         airline=None,
+        # ...mas informa quem VENDE, e essa e a referencia que permite ir
+        # comprar. Guardada em campo proprio: no `airline` ela quebraria a
+        # comparacao com as companhias evitadas do monitor.
+        agency=bruto.get("gate") or None,
         flight_number=None,
         stops=bruto.get("number_of_changes"),
         duration_minutes=_inteiro_positivo(bruto.get("duration")),

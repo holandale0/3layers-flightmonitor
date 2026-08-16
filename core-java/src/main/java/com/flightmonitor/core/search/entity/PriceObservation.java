@@ -78,6 +78,17 @@ public class PriceObservation {
 
     private Short stops;
 
+    /**
+     * Quem <b>vende</b> a passagem (Kiwi.com, Mytrip.com).
+     *
+     * <p>Separado de {@code airline}, que e quem <b>opera</b> o voo, porque
+     * {@code Preferencias.companhiaEvitada()} compara o {@code airline} com a
+     * lista de companhias evitadas do monitor. Agencia naquele campo faria a
+     * preferencia parar de funcionar em silencio.
+     */
+    @Column(length = 80)
+    private String agency;
+
     @Column(name = "duration_minutes")
     private Integer durationMinutes;
 

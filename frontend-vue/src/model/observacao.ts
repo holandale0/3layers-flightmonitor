@@ -7,7 +7,10 @@ export interface Observacao {
   returnDate: string | null
   price: number
   currency: string
+  /** Quem OPERA o voo. Comparado com as companhias evitadas do monitor. */
   airline: string | null
+  /** Quem VENDE a passagem (Kiwi.com, Mytrip.com). E a referencia para comprar. */
+  agency: string | null
   stops: number | null
   durationMinutes: number | null
   departureAt: string | null
@@ -53,4 +56,22 @@ export function menorPrecoPorData(obs: Observacao[]): MenorPorData[] {
   }
 
   return [...porData.values()].sort((a, b) => a.data.localeCompare(b.data))
+}
+
+/**
+ * Quem procurar para comprar esta passagem.
+ *
+ * As duas fontes da camada 1 sabem metades diferentes: o calendario de ida e
+ * volta diz a **companhia** e nao diz a agencia; o de so ida diz a **agencia**
+ * e nao diz a companhia. Elas ficam separadas no banco de proposito — o campo
+ * `airline` e comparado com as companhias que o monitor evita, e agencia ali
+ * quebraria a regra em silencio.
+ *
+ * Mas quem le a tabela quer saber uma coisa so: *onde eu compro isso?* Entao na
+ * tela elas aparecem juntas, com o rótulo dizendo qual das duas e.
+ */
+export function ondeComprar(o: Observacao): { valor: string; tipo: 'companhia' | 'agência' } | null {
+  if (o.airline) return { valor: o.airline, tipo: 'companhia' }
+  if (o.agency) return { valor: o.agency, tipo: 'agência' }
+  return null
 }
