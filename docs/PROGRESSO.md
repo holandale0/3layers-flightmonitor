@@ -167,3 +167,43 @@ e a primeira observação de só ida seria acusada como queda de 40%. É o [RISC
 acontecendo. Aguardando decisão sobre apagar.
 
 **Placar:** core-java **414**, worker-python **111**, frontend-vue **64**.
+
+---
+
+### 2026-08-16 — 🧹 Histórico de preços zerado
+
+A pedido do usuário, depois do [BUG-016](BUGS.md): apagar os dados coletados de **todos** os
+monitores — inclusive os que estavam corretos — e preservar a configuração.
+
+| Apagado | Preservado |
+|---|---|
+| `price_observation` (201) | `monitor` (5) |
+| `search_run` (153) | `recipient` (3) |
+| `alert` (5) | `monitor_recipient` (5) |
+| | `monitor_avoided_airline`, `whatsapp_config` |
+
+**O `alert` entrou na limpeza por um motivo que não é óbvio:** o anti-spam lê essa tabela. Manter
+os cinco alertas antigos silenciaria por 12 horas o primeiro alerta válido depois do reset — um
+sistema "zerado" que não avisa é pior que um sistema com histórico sujo.
+
+Também zerei `monitor.last_searched_at` e adiantei `next_search_at`: sem isso, o painel mostraria
+"última busca" apontando para uma varredura que não existe mais.
+
+**Backup antes** (48 KB, `pg_dump --data-only` das três tabelas), porque a operação é
+irreversível e custava nada.
+
+**Verificado com dado novo.** A primeira varredura do GRU → BEL, somente ida:
+
+```
+ida         volta         preco     chegada
+2026-12-19  (sem volta)   1004.00   (sem chegada)
+2026-12-20  (sem volta)   1064.00   (sem chegada)
+```
+
+Sem alerta, corretamente: R$ 1.004 está acima do teto de R$ 500 configurado. Antes da correção,
+este mesmo monitor teria gravado R$ 1.674 com volta em 14/12.
+
+**Continua em aberto:** a estatística é por **rota** ([D-016](DECISOES.md)), e uma rota pode
+agora ter observações de só ida e de ida e volta misturadas — a consulta filtra por origem,
+destino, período e confirmação, e nada mais. Antes do BUG-016 isso não existia, porque tudo era
+ida e volta. Aguardando decisão.

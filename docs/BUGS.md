@@ -167,9 +167,16 @@ de volta e alimentava com dados de ida e volta — exercitando o calendário por
 ida. O comportamento que eles descreviam continua válido; errada era a pergunta que chegava até
 ele. O helper ganhou janela de volta, e nasceu o `test_so_ida.py`.
 
-**⚠️ Pendente: os dados já gravados.** 147 observações de 4 monitores de só ida carregam preço de
-ida e volta. Misturar os dois produtos na mesma série é pior que qualquer um dos dois sozinho —
-é o [RISCO-009](BUGS.md) se materializando. Aguardando decisão do usuário.
+**✅ Os dados gravados foram zerados** (16/08/2026, a pedido do usuário). Apagados
+`price_observation` (201), `search_run` (153) e `alert` (5); preservados monitores, destinatários,
+vínculos e preferências. Os monitores voltaram a `last_searched_at = NULL`.
+
+O `alert` entrou na limpeza por um motivo prático: o anti-spam lê essa tabela, e alertas antigos
+silenciariam por 12h o primeiro alerta válido depois do reset.
+
+**Verificado com dado novo:** a primeira varredura do GRU → BEL gravou R$ 1.004 e R$ 1.064,
+**sem data de volta e sem horário de chegada inventado** — e corretamente sem alerta, porque
+R$ 1.004 está acima do teto de R$ 500.
 
 ---
 
