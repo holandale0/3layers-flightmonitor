@@ -113,6 +113,66 @@ condição. É exatamente o argumento que justificou aquela etapa.
 
 ---
 
+### ~~BUG-016 · Monitor de somente ida recebia preço de ida e volta~~ — ✅ FECHADO
+**Status:** ✅ **código corrigido em 2026-08-16** — o provider passou a perguntar pelo produto certo
+**Encontrado em:** 2026-08-16 · reportado pelo usuário · Componente: worker-python (camada 1)
+**Severidade:** **alta** — dado errado no histórico, e o sistema cego para as oportunidades que
+deveria achar
+
+**Sintoma relatado:** um monitor GRU → BEL configurado como **somente ida** exibia observações com
+a coluna *Volta* preenchida (14/12/2026).
+
+**Causa:** o filtro da camada 1 era **assimétrico**:
+
+```python
+if req.return_from is not None:      # tem janela de volta -> confere
+    ...
+# sem janela de volta -> NAO CONFERE NADA
+```
+
+"Somente ida" é expresso como **ausência** de janela de volta, e o código lia essa ausência como
+*"tanto faz"* em vez de *"não pode ter volta"*.
+
+**O dano não era cosmético.** Testado contra a API real em 16/08/2026, GRU → BEL em dezembro:
+
+| Consulta | Preço |
+|---|---|
+| ida e volta (o que era gravado) | R$ 1.674 |
+| **só ida** (o que devia ser gravado) | **R$ 1.004** |
+
+Um monitor de só ida com teto de R$ 1.100 **nunca teria alertado**, porque comparava R$ 1.674 com
+o teto. O sistema estava cego para as oportunidades que existia para achar.
+
+**A investigação teve uma hipótese errada no meio.** Consultei a API e vi `return_date: None` em
+todas as entradas, e cheguei a concluir que a data de volta era *inventada pelo nosso código*.
+Estava conferindo a chave errada: o endpoint usa **`return_at`**, e não `return_date`. Com a chave
+certa, todas as 5 entradas tinham volta. Vale registrar: a hipótese mais dramática ("o código
+inventa dados") era falsa, e só não virou correção errada porque foi testada.
+
+**Por que não bastou filtrar:** o `v1/prices/calendar` **ignora `one_way`**. Foi testado com
+`one_way=true`, `one_way=1` e sem o parâmetro — nas três, todas as entradas voltam com `return_at`.
+Filtrar deixaria o monitor de só ida **sem nenhum preço**, trocando dado errado por dado nenhum.
+
+**Correção:** o provider escolhe o endpoint conforme a pergunta — `v2/prices/latest` com
+`one_way=true` para somente ida, `v1/prices/calendar` para ida e volta ([D-107](DECISOES.md)). E o
+filtro de só ida descarta oferta com volta mesmo assim: o bug nasceu de confiar numa promessa da
+fonte sem conferir.
+
+**Um segundo defeito no mesmo lugar:** `arrival_at` recebia `return_at` — ou seja, o horário de
+**partida da volta** era gravado como **chegada da ida**. O endpoint não devolve horário de
+chegada; agora o campo fica nulo, que é a verdade.
+
+**Os testes existentes codificavam o bug.** O helper `pedido()` montava requisição **sem** janela
+de volta e alimentava com dados de ida e volta — exercitando o calendário por um caminho de só
+ida. O comportamento que eles descreviam continua válido; errada era a pergunta que chegava até
+ele. O helper ganhou janela de volta, e nasceu o `test_so_ida.py`.
+
+**⚠️ Pendente: os dados já gravados.** 147 observações de 4 monitores de só ida carregam preço de
+ida e volta. Misturar os dois produtos na mesma série é pior que qualquer um dos dois sozinho —
+é o [RISCO-009](BUGS.md) se materializando. Aguardando decisão do usuário.
+
+---
+
 ### ~~BUG-015 · Campo nulo sumia do JSON e virava `undefined` no painel~~ — ✅ FECHADO
 **Status:** ✅ **fechado em 2026-08-14** — a API passou a enviar `null` explícito, e o painel
 ficou defensivo

@@ -55,6 +55,30 @@ def oferta_bruta(
 
 
 def pedido(**extra) -> CalendarSearchRequest:
+    """Pedido de IDA E VOLTA — o caminho do endpoint de calendario.
+
+    A janela de volta esta aqui de proposito. Antes do BUG-016 este helper nao
+    a tinha, e os testes exercitavam o calendario com um pedido de SOMENTE IDA
+    — codificando exatamente o bug: monitor de so ida recebendo preco de ida e
+    volta. O comportamento que eles descrevem (parsing, RISCO-003, RISCO-006)
+    continua valendo; o que estava errado era a pergunta que chegava ate ele.
+
+    Para o caminho de so ida, use `pedido_so_ida()`.
+    """
+    base = {
+        "origin": "GRU",
+        "destination": "LIS",
+        "departure_from": date(2027, 3, 10),
+        "departure_to": date(2027, 3, 20),
+        "return_from": date(2027, 3, 15),
+        "return_to": date(2027, 4, 30),
+    }
+    base.update(extra)
+    return CalendarSearchRequest(**base)
+
+
+def pedido_so_ida(**extra) -> CalendarSearchRequest:
+    """Pedido de SOMENTE IDA — vai para o `v2/prices/latest`."""
     base = {
         "origin": "GRU",
         "destination": "LIS",

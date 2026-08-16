@@ -108,3 +108,62 @@ vez, e o risco de bloqueio vem da repetição desassistida — mas fica escrito 
 não esquecimento.
 
 **Placar:** core-java **414**, worker-python **104**, frontend-vue **64**.
+
+---
+
+### 2026-08-16 — 🐛 [BUG-016](BUGS.md) · O monitor de só ida comprando passagem de ida e volta
+
+Reportado da tela: um monitor GRU → BEL configurado como **somente ida** mostrando observações com
+data de volta.
+
+**O filtro era assimétrico.** Com janela de volta, conferia; sem janela de volta, **não conferia
+nada**. "Somente ida" é expresso como *ausência*, e o código leu ausência como "tanto faz".
+
+**O dano não era cosmético.** Contra a API real, GRU → BEL em dezembro: ida e volta R$ 1.674, só
+ida **R$ 1.004**. Um monitor de só ida com teto de R$ 1.100 nunca teria alertado — o sistema
+estava **cego para as oportunidades que existia para achar**.
+
+#### Uma hipótese errada no meio da investigação
+
+Consultei a API, vi `return_date: None` em todas as entradas, e concluí que a data de volta era
+**inventada pelo nosso código**. Estava conferindo a chave errada — o endpoint usa `return_at`.
+Com a chave certa, as 5 entradas tinham volta.
+
+Fica registrado porque a hipótese mais dramática ("o código inventa dados") era falsa, e só não
+virou uma correção errada porque foi testada antes de virar código.
+
+#### Filtrar não resolveria
+
+O `v1/prices/calendar` **ignora `one_way`** — testei com `true`, com `1` e sem o parâmetro. Nas
+três, tudo volta com `return_at`. Descartar as ofertas com volta deixaria o monitor de só ida sem
+preço nenhum: dado errado viraria dado nenhum.
+
+A correção é **perguntar certo** ([D-107](DECISOES.md)): `v2/prices/latest?one_way=true` para só
+ida. Cobre menos datas (2 contra 5) — e dois preços certos valem mais que cinco de outro produto.
+
+#### Um segundo defeito no mesmo mapeamento
+
+`arrival_at` recebia `return_at`: o horário de **partida da volta** era gravado como **chegada da
+ida**. O endpoint não devolve chegada; o campo agora fica nulo, que é a verdade.
+
+#### Os testes existentes codificavam o bug
+
+O helper `pedido()` montava requisição **sem** janela de volta e alimentava com dados de ida e
+volta — exercitando o calendário por um caminho de só ida. Oito testes quebraram com a correção,
+e estavam certos sobre o comportamento e errados sobre a pergunta. O helper ganhou janela de volta,
+e nasceu o `test_so_ida.py` com sete testes novos.
+
+#### Verificado contra a fonte real
+
+```
+SO IDA:        ida=2026-12-19 volta=None preco=1004 chegada=None
+               ida=2026-12-20 volta=None preco=1064 chegada=None
+IDA E VOLTA:   ida=2026-12-09 volta=2026-12-14 preco=1674
+```
+
+**⚠️ Fica pendente:** 147 observações de 4 monitores de só ida têm preço de ida e volta gravado.
+Misturar dois produtos na mesma série é pior que qualquer um sozinho — a mediana ficaria no meio,
+e a primeira observação de só ida seria acusada como queda de 40%. É o [RISCO-009](BUGS.md)
+acontecendo. Aguardando decisão sobre apagar.
+
+**Placar:** core-java **414**, worker-python **111**, frontend-vue **64**.

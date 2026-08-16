@@ -1710,6 +1710,30 @@ Ela é disparada por uma pessoa, uma de cada vez, e cada uma leva alguns segundo
 de bloqueio vem da repetição **desassistida**, que é justamente o que o intervalo controla.
 Registrado aqui para ser decisão, e não esquecimento.
 
+### D-107 · O provider escolhe o endpoint conforme o produto pedido ✅
+**Decisão:** monitor de **somente ida** consulta `v2/prices/latest` com `one_way=true`; monitor com
+janela de volta consulta `v1/prices/calendar`.
+
+**Por quê:** os dois endpoints respondem perguntas diferentes, e o [BUG-016](BUGS.md) foi fazer a
+pergunta errada. Testado contra a API real:
+
+| Endpoint | `one_way` | Resultado |
+|---|---|---|
+| `v1/prices/calendar` | ignorado (`true`, `1`, ausente) | sempre com `return_at` |
+| `v2/prices/latest` | respeitado | preços de só ida, `return_date` vazio |
+
+**Filtrar não resolveria.** Como o calendário só devolve ida e volta, descartar as ofertas com
+volta deixaria o monitor de só ida sem preço nenhum — trocar dado errado por dado nenhum é trocar
+um problema por outro.
+
+**O custo, assumido:** o endpoint de só ida cobre menos datas (2 contra 5, no teste da rota
+GRU → BEL em dezembro). **Dois preços certos valem mais que cinco errados** — e os cinco não
+eram imprecisos, eram de outro produto.
+
+**Filtro mesmo assim.** O `v2/prices/latest` promete respeitar `one_way`, e a oferta com volta é
+descartada de qualquer forma. O bug nasceu exatamente de confiar numa promessa da fonte sem
+conferir; a correção não repete o erro.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

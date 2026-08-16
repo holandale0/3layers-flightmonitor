@@ -28,7 +28,16 @@ from app.schemas import CalendarSearchRequest, CalendarSearchResponse, FlightOff
 
 logger = logging.getLogger(__name__)
 
+# Ida E VOLTA. Este endpoint IGNORA `one_way` — foi testado contra a API real:
+# com `one_way=true`, `one_way=1` ou sem o parametro, ele devolve sempre ofertas
+# com `return_at`. Serve para monitor com janela de volta, e so.
 BASE_URL = "https://api.travelpayouts.com/v1/prices/calendar"
+
+# SO IDA. O unico endpoint da Travelpayouts que respeita `one_way`. Devolve
+# menos datas que o calendario (2 contra 5, no teste que achou o BUG-016) —
+# e sao os precos certos, o que vale mais. Ver D-107.
+BASE_URL_SO_IDA = "https://api.travelpayouts.com/v2/prices/latest"
+
 SOURCE = "TRAVELPAYOUTS"
 TIMEOUT_SEGUNDOS = 20.0
 
@@ -103,8 +112,7 @@ def _para_oferta(dia: str, bruto: dict[str, Any], moeda: str) -> FlightOffer | N
     if preco is None:
         return None
 
-    volta_bruta = bruto.get("return_at")
-    volta = _horario_local(volta_bruta)
+    volta = _horario_local(bruto.get("return_at"))
     numero = bruto.get("flight_number")
 
     return FlightOffer(
@@ -116,8 +124,43 @@ def _para_oferta(dia: str, bruto: dict[str, Any], moeda: str) -> FlightOffer | N
         flight_number=str(numero) if numero is not None else None,
         stops=bruto.get("transfers"),
         departure_at=_horario_local(bruto.get("departure_at")),
-        arrival_at=volta,
+        # Este endpoint NAO devolve horario de chegada. A primeira versao punha
+        # `return_at` aqui — que e a partida da VOLTA, e nao a chegada da ida.
+        # Gravava um horario errado no historico; nulo diz a verdade (BUG-016).
+        arrival_at=None,
         expires_at=_instante(bruto.get("expires_at")),
+        source=SOURCE,
+    )
+
+
+def _para_oferta_so_ida(bruto: dict[str, Any], moeda: str) -> FlightOffer | None:
+    """Mapeia uma entrada do `v2/prices/latest`, que tem outro formato.
+
+    Campos diferentes do calendario: `depart_date` em vez da chave do dicionario,
+    `value` em vez de `price`, `number_of_changes` em vez de `transfers`, e
+    `gate` no lugar de `airline`.
+    """
+    try:
+        partida = date.fromisoformat(str(bruto.get("depart_date", ""))[:10])
+    except ValueError:
+        return None
+
+    preco = _preco(bruto.get("value"))
+    if preco is None:
+        return None
+
+    return FlightOffer(
+        departure_date=partida,
+        # So ida: nao ha volta, e dizer isso e o proposito deste caminho.
+        return_date=None,
+        price=preco,
+        currency=moeda,
+        airline=bruto.get("gate"),
+        flight_number=None,
+        stops=bruto.get("number_of_changes"),
+        departure_at=None,
+        arrival_at=None,
+        expires_at=None,
         source=SOURCE,
     )
 
@@ -140,18 +183,28 @@ class TravelpayoutsProvider:
 
         resposta = CalendarSearchResponse(origin=req.origin, destination=req.destination)
 
+        # A fonte tem DOIS endpoints, e eles respondem perguntas diferentes.
+        # Perguntar a errada foi o BUG-016: um monitor de somente ida recebia
+        # preco de ida E VOLTA, e comparava esse preco com o proprio teto.
+        so_ida = req.return_from is None
+
         proprio = cliente is None
         cliente = cliente or httpx2.AsyncClient(timeout=TIMEOUT_SEGUNDOS)
         try:
-            brutas: list[tuple[str, dict[str, Any]]] = []
-            for mes in _meses_da_janela(req.departure_from, req.departure_to):
-                brutas.extend(await self._consultar_mes(cliente, req, mes, resposta))
+            if so_ida:
+                brutos = await self._consultar_so_ida(cliente, req, resposta)
+                resposta.returned = len(brutos)
+                resposta.offers = self._filtrar_so_ida(brutos, req, resposta)
+            else:
+                brutas: list[tuple[str, dict[str, Any]]] = []
+                for mes in _meses_da_janela(req.departure_from, req.departure_to):
+                    brutas.extend(await self._consultar_mes(cliente, req, mes, resposta))
+                resposta.returned = len(brutas)
+                resposta.offers = self._filtrar(brutas, req, resposta)
         finally:
             if proprio:
                 await cliente.aclose()
 
-        resposta.returned = len(brutas)
-        resposta.offers = self._filtrar(brutas, req, resposta)
         resposta.kept = len(resposta.offers)
         resposta.offers.sort(key=lambda o: (o.price, o.departure_date))
 
@@ -203,6 +256,108 @@ class TravelpayoutsProvider:
 
         self._registrar_codigo_do_provider(dados, req, resposta)
         return list(dados.items())
+
+    async def _consultar_so_ida(
+        self,
+        cliente: httpx2.AsyncClient,
+        req: CalendarSearchRequest,
+        resposta: CalendarSearchResponse,
+    ) -> list[dict[str, Any]]:
+        """Precos de SO IDA, no unico endpoint que respeita `one_way`.
+
+        Devolve menos datas que o calendario. E o que a fonte tem: preferimos
+        dois precos certos a cinco errados — e o preco errado nao era so
+        impreciso, era de outro produto.
+        """
+        parametros = {
+            "origin": req.origin,
+            "destination": req.destination,
+            "beginning_of_period": req.departure_from.strftime("%Y-%m-01"),
+            "period_type": "month",
+            "one_way": "true",
+            "currency": req.currency,
+            "limit": 1000,
+            "token": self._token,
+        }
+
+        try:
+            r = await cliente.get(BASE_URL_SO_IDA, params=parametros)
+            r.raise_for_status()
+            corpo = r.json()
+        except httpx2.TimeoutException as e:
+            raise TravelpayoutsError("timeout ao consultar precos de so ida") from e
+        except httpx2.HTTPStatusError as e:
+            raise TravelpayoutsError(
+                f"a fonte respondeu HTTP {e.response.status_code} para so ida"
+            ) from e
+        except httpx2.HTTPError as e:
+            raise TravelpayoutsError(f"falha de rede ao consultar so ida: {e}") from e
+        except ValueError as e:
+            raise TravelpayoutsError("resposta de so ida nao e JSON valido") from e
+
+        if not isinstance(corpo, dict) or corpo.get("success") is False:
+            motivo = corpo.get("error") if isinstance(corpo, dict) else corpo
+            raise TravelpayoutsError(f"a fonte recusou a consulta de so ida: {motivo}")
+
+        dados = corpo.get("data")
+        if not isinstance(dados, list):
+            return []
+
+        brutos = [d for d in dados if isinstance(d, dict)]
+        if brutos:
+            resposta.provider_origin = brutos[0].get("origin")
+            resposta.provider_destination = brutos[0].get("destination")
+
+        return brutos
+
+    def _filtrar_so_ida(
+        self,
+        brutos: list[dict[str, Any]],
+        req: CalendarSearchRequest,
+        resposta: CalendarSearchResponse,
+    ) -> list[FlightOffer]:
+        fora_da_janela = 0
+        com_volta = 0
+        ofertas: list[FlightOffer] = []
+
+        for bruto in brutos:
+            # Cinto e suspensorio: o endpoint promete respeitar `one_way`, mas o
+            # BUG-016 nasceu de confiar numa promessa dessas. Oferta com volta
+            # num pedido de so ida e descartada, venha de onde vier.
+            if str(bruto.get("return_date") or "").strip():
+                com_volta += 1
+                continue
+
+            oferta = _para_oferta_so_ida(bruto, req.currency)
+            if oferta is None:
+                continue
+
+            # RISCO-007: nunca confiar que o provider respeitou o periodo pedido.
+            if not (req.departure_from <= oferta.departure_date <= req.departure_to):
+                fora_da_janela += 1
+                continue
+
+            if req.max_stops is not None and oferta.stops is not None:
+                if oferta.stops > req.max_stops:
+                    fora_da_janela += 1
+                    continue
+
+            ofertas.append(oferta)
+
+        if com_volta:
+            resposta.warnings.append(
+                f"{com_volta} oferta(s) de ida e volta descartada(s): este monitor e somente ida"
+            )
+        if fora_da_janela:
+            resposta.warnings.append(
+                f"{fora_da_janela} oferta(s) descartada(s) por estarem fora dos criterios pedidos"
+            )
+        if not ofertas and brutos:
+            resposta.warnings.append(
+                "a fonte devolveu precos de so ida, mas nenhum dentro da janela do monitor"
+            )
+
+        return ofertas
 
     def _registrar_codigo_do_provider(
         self,
