@@ -22,7 +22,16 @@ RUN npm run build
 # ------------------------------------------------------------------- execucao
 FROM nginx:1.27-alpine
 
+# `htpasswd`, para gerar o arquivo de senha no arranque a partir do ambiente.
+# Gerar aqui e nao versionar o hash: senha em repositorio e senha vazada, e
+# este repositorio e publico.
+RUN apk add --no-cache apache2-utils
+
 COPY --from=construcao /construcao/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# O nginx executa tudo em /docker-entrypoint.d/*.sh antes de subir.
+COPY 20-senha-do-painel.sh /docker-entrypoint.d/20-senha-do-painel.sh
+RUN chmod +x /docker-entrypoint.d/20-senha-do-painel.sh
 
 EXPOSE 80

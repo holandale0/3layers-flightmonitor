@@ -1799,6 +1799,44 @@ intermediou a venda.
 | `v2/prices/latest` (só ida) | ❌ | ✅ | ✅ |
 | fast-flights (camada 2) | ✅ | ❌ | ✅ |
 
+### D-111 · Túnel em vez de porta aberta, e senha no nginx em vez de login ✅
+**Decisão:** o sistema roda na máquina do usuário e é publicado por um **túnel Cloudflare**; o
+painel é protegido por **basic auth no nginx**, e não por autenticação na aplicação.
+
+**Por que túnel e não redirecionamento de porta:** IP residencial muda, e boa parte dos provedores
+brasileiros usa **CGNAT** — que impede redirecionamento de porta mesmo com IP fixo. O túnel não
+depende de nenhum dos dois: a conexão sai de dentro para fora, e **nada** fica aberto no roteador.
+
+De quebra, o TLS termina na Cloudflare: o webhook da Meta exige HTTPS, e assim não há certificado
+para emitir nem renovar aqui dentro.
+
+**Por que basic auth e não login de verdade:** o furo a fechar é concreto — hoje quem alcança o
+painel edita monitores. Basic auth no proxy que **já existe** resolve isso em minutos, sem
+reabrir a decisão de escopo da seção 2 (sem login, sistema pessoal) e sem acrescentar sessão,
+tela de login e recuperação de senha para manter, num sistema de **um** usuário.
+
+**A senha vale para a API também**, e não só para a tela: proteger o `/` e deixar o `/api` aberto
+ao lado seria teatro.
+
+**Uma única rota fica de fora, e não há escolha:** o webhook da Meta. Quem chama é o servidor
+dela, que não tem como responder a basic auth. Ele se protege por outro meio — a assinatura
+`X-Hub-Signature-256`, conferida com o app secret (E1.17).
+
+**A senha nunca entra na imagem nem no repositório.** O `.htpasswd` é gerado no arranque do
+container, a partir do ambiente. Imagem é artefato compartilhável; senha não.
+
+**O compose de produção recusa subir sem senha** (`${PAINEL_SENHA:?...}`). Painel aberto na
+internet por esquecimento é pior que um deploy que falha alto.
+
+**`unless-stopped`, e não `always`:** o usuário escolheu subir quando quiser. `always` traria de
+volta um container que ele parou de propósito — desobedecer em silêncio é pior que não
+reiniciar.
+
+**O que esta decisão assume, e está escrito no guia:** o sistema só varre enquanto a máquina
+estiver ligada. Um monitor de 6 em 6 horas perde a madrugada com o PC desligado — e o sistema
+existe justamente para vigiar quando ninguém está olhando. O histórico não se perde: o próximo
+horário fica no banco, e ao religar o scheduler encontra os vencidos.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

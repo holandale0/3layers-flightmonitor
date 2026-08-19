@@ -291,3 +291,70 @@ pela segunda vez no mesmo dia. Um record com onze componentes construído por po
 natureza; anotado como incomodo, não como bug.
 
 **Placar:** core-java **414**, worker-python **116**, frontend-vue **74**.
+
+---
+
+### 2026-08-18 — ✅ E4.4 concluída · Produção na própria máquina, publicada por túnel
+
+Escolhas do usuário: rodar na **máquina dele**, painel **acessível pela internet com senha**, e
+**webhook da Meta configurado junto**.
+
+As três juntas têm uma tensão: máquina doméstica publicada na internet exige URL estável, e IP
+residencial muda. Pior: boa parte dos provedores brasileiros usa **CGNAT**, que impede
+redirecionamento de porta mesmo com IP fixo.
+
+**Túnel Cloudflare resolve os dois** ([D-111](DECISOES.md)): a conexão sai de dentro para fora,
+nada fica aberto no roteador, e o TLS termina na Cloudflare — o webhook exige HTTPS e não há
+certificado para emitir aqui dentro. Como o usuário já tem domínio próprio, a URL fica estável,
+que é o que a Meta precisa para registrar o webhook uma vez só.
+
+#### O que muda de desenvolvimento para produção
+
+| | Desenvolvimento | Produção |
+|---|---|---|
+| Postgres e RabbitMQ | portas publicadas | **só na rede interna** |
+| Worker | porta publicada | **só na rede interna** |
+| Painel | aberto, em `0.0.0.0` | **com senha**, em `127.0.0.1` + túnel |
+| Canário | desligado | **ligado** |
+| Memória do core | sem limite | 768 MB |
+
+Sobreposição, e não um segundo compose: duplicar o arquivo inteiro garante que as duas cópias
+divirjam.
+
+#### Duas coisas que só apareceram rodando
+
+**`ports: []` não remove porta.** O Compose **anexa** listas entre arquivos, então a lista vazia
+não apagava nada e o banco continuava publicado. Só percebi conferindo o `config` — o `up` não
+reclama. Resolvido com `!reset []`, que existe exatamente para isso.
+
+**A senha quebrou o healthcheck.** O painel virou `unhealthy` com o nginx perfeitamente no ar: o
+healthcheck fazia `wget` na raiz, e a raiz passou a exigir credencial. Um healthcheck que exige
+credencial mede a credencial, e não a saúde. Nasceu o `/healthz`, sem senha, que responde `ok`
+sem tocar no core nem no banco.
+
+#### Verificado com a pilha de produção de verdade
+
+```
+core       Up (healthy)     8081/tcp                 <- sem porta no host
+postgres   Up (healthy)     5432/tcp                 <- sem porta no host
+worker     Up (healthy)     8001/tcp                 <- sem porta no host
+painel     Up (healthy)     127.0.0.1:8090->80/tcp   <- so no laco local
+
+/            -> 401      /healthz -> 200
+/api/monitors-> 401      / com senha -> 200
+```
+
+O túnel foi testado com token falso e reiniciou em laço, como esperado — o que confirma que ele
+**depende** do token e não sobe silenciosamente sem publicar nada.
+
+#### O que fica dito, e não escondido
+
+O sistema só varre enquanto a máquina estiver ligada. Um monitor de 6 em 6 horas perde a
+madrugada com o PC desligado — e ele existe justamente para vigiar quando ninguém está olhando.
+O histórico não se perde: o próximo horário fica no banco, e ao religar o scheduler encontra os
+vencidos. Migrar para uma VPS depois é o mesmo compose e um `.env` diferente.
+
+**Falta você:** criar o túnel na Cloudflare e pôr duas linhas no `.env`. Passo a passo em
+[GUIA-DEPLOY.md](GUIA-DEPLOY.md).
+
+**Placar:** core-java **414**, worker-python **116**, frontend-vue **74**.

@@ -13,7 +13,27 @@
 [![Testes](https://img.shields.io/badge/Testes-524_passando-success?style=flat-square)](#-qualidade)
 [![License](https://img.shields.io/badge/Licença-MIT-green?style=flat-square)](./LICENSE)
 
-[🐳 Subir em 2 minutos](#-como-rodar-o-projeto) · [📐 Diagramas interativos](./diagrams/) · [📚 Documentação](#-documentação)
+[🎯 Motivação](#-motivação) · [🐳 Subir em 2 minutos](#-como-rodar-o-projeto) · [📐 Diagramas interativos](./diagrams/) · [📚 Documentação](#-documentação)
+
+---
+
+## 🎯 Motivação
+
+Moro em **São Paulo**, mas sou natural de **Belém do Pará**. Viajo para lá pelo menos uma vez por
+ano, e minha família faz o caminho inverso para me visitar aqui. É um trecho que se repete — e que
+quase nunca está barato justamente nos meses em que dá para viajar.
+
+Preço de passagem muda o tempo todo. A mesma data custa uma coisa hoje e outra amanhã, às vezes
+com poucas horas de diferença. A oferta boa aparece e some. Acompanhar isso à mão significa abrir
+o site várias vezes por dia, durante meses — e mesmo assim passar batido bem na hora em que o
+preço caiu.
+
+**Ninguém tem tempo de monitorar preço de passagem 24 horas por dia. Um programa tem.**
+
+Já existem ferramentas que fazem algo parecido. Decidi construir esta do zero por dois motivos que
+andam juntos: **resolver um problema meu de verdade** e **pôr em prática o que sei de engenharia
+de software** — arquitetura, testes, integração com fontes instáveis e gratuitas, e as decisões
+que só aparecem quando o sistema precisa funcionar sozinho, sem ninguém olhando.
 
 ---
 

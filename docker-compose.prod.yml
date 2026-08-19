@@ -1,0 +1,97 @@
+# =============================================================================
+# Sobreposição de produção — etapa E4.4
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# O compose base serve ao desenvolvimento: publica portas de banco e de fila
+# para inspeção, e deixa o painel aberto. Nenhuma dessas coisas deve valer numa
+# máquina alcançável pela internet.
+#
+# Sobreposição, e não um arquivo separado: duplicar o compose inteiro garante
+# que as duas cópias divirjam. Aqui só aparece o que MUDA, e o que mudou fica
+# legível numa tela.
+#
+# `restart: unless-stopped`, e não `always`: o sistema roda na máquina do
+# usuário, que decidiu subir quando quiser. `always` traria de volta um
+# container que ele parou de propósito — desobedecer em silêncio é pior que
+# não reiniciar.
+# =============================================================================
+
+services:
+
+  postgres:
+    # O banco deixa de ser alcançável de fora do host. Ele já era acessível
+    # apenas pela rede interna do compose; o que se remove aqui é a porta
+    # publicada, que existia para abrir um cliente SQL durante o desenvolvimento.
+    ports: !reset []
+    restart: unless-stopped
+
+  rabbitmq:
+    # Mesma coisa, e vale duplamente para o painel de administração na 15672:
+    # ele não tem senha forte por padrão e não precisa existir em produção.
+    ports: !reset []
+    restart: unless-stopped
+
+  worker:
+    # O navegador nunca fala com o worker — quem fala é o core, pela rede
+    # interna (regra 1 da seção 3 do PLANO-DE-ACAO). A porta publicada existia
+    # só para depurar.
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      LOG_FORMAT: ecs
+
+  core:
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      # O canário passa a valer a pena: em produção o sistema roda sem ninguém
+      # olhando, que é exatamente quando uma fonte quebrada passa despercebida.
+      CANARIO_ENABLED: ${CANARIO_ENABLED:-true}
+      LOG_FORMAT: ecs
+    deploy:
+      resources:
+        limits:
+          # A JVM lê o limite do container e calcula a heap a partir dele
+          # (MaxRAMPercentage=75 no Dockerfile). Sem limite, ela cresce até o
+          # que a máquina tiver — e esta máquina é a do usuário, que faz outras
+          # coisas ao mesmo tempo.
+          memory: 768M
+
+  painel:
+    restart: unless-stopped
+    environment:
+      PAINEL_USUARIO: ${PAINEL_USUARIO:-admin}
+      # SEM valor padrão, de propósito: em produção o painel não pode subir
+      # aberto por esquecimento. Sem a variável, o compose recusa a subir.
+      PAINEL_SENHA: ${PAINEL_SENHA:?defina PAINEL_SENHA no .env antes de subir em producao}
+    ports: !override
+      # Só no laço local do host. Quem publica na internet é o túnel, que
+      # termina o TLS e tem a URL estável — expor a porta direto exigiria abrir
+      # o roteador e conviver com IP residencial dinâmico.
+      - "127.0.0.1:${PAINEL_PORT:-8090}:80"
+
+  # ---------------------------------------------------------------- o túnel
+  #
+  # Publica o painel e o webhook na internet SEM abrir porta no roteador: a
+  # conexão sai de dentro para fora, e a Cloudflare devolve o tráfego por ela.
+  #
+  # É o que torna viável hospedar na própria máquina: IP residencial muda, e
+  # boa parte dos provedores brasileiros usa CGNAT, que impede redirecionamento
+  # de porta mesmo com IP fixo. O túnel não depende de nenhum dos dois.
+  #
+  # O HTTPS termina na Cloudflare, então o webhook da Meta — que exige TLS —
+  # funciona sem certificado nenhum aqui dentro.
+  #
+  # Configuração do lado da Cloudflare: o hostname público aponta para
+  # `http://painel:80`, que é o nome do serviço nesta mesma rede. Ver
+  # docs/GUIA-DEPLOY.md.
+  tunel:
+    image: cloudflare/cloudflared:latest
+    container_name: flightmon-tunel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?defina CLOUDFLARE_TUNNEL_TOKEN no .env}
+    depends_on:
+      - painel

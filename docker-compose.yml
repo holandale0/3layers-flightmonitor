@@ -161,6 +161,11 @@ services:
       context: ./frontend-vue
     container_name: flightmon-painel
     restart: unless-stopped
+    environment:
+      # Senha do painel (E4.4). Vazia em desenvolvimento, onde ele so escuta em
+      # localhost; obrigatoria assim que a porta sair da maquina.
+      PAINEL_USUARIO: ${PAINEL_USUARIO:-admin}
+      PAINEL_SENHA: ${PAINEL_SENHA:-}
     depends_on:
       # Sem esperar `healthy`: o nginx sobe e serve o painel mesmo com o core
       # fora, e a tela mostra o erro da API — que e melhor do que nao abrir.
@@ -174,7 +179,7 @@ services:
       # 127.0.0.1 e nao localhost: o wget do BusyBox tenta ::1 primeiro,
       # e o nginx escuta em IPv4 — dava "connection refused" com o
       # servidor funcionando perfeitamente.
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
       interval: 15s
       timeout: 5s
       retries: 3
