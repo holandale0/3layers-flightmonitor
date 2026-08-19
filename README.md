@@ -39,17 +39,37 @@ que só aparecem quando o sistema precisa funcionar sozinho, sem ninguém olhand
 
 ## 📸 Demonstração
 
-Um monitor é uma rota, uma janela de datas e um preço-teto:
+Um monitor é uma rota, uma janela de datas e um preço-teto. É tudo o que o sistema precisa para
+começar a vigiar sozinho:
 
-```
-GRU → LIS
-Ida:    entre 10/03/2027 e 20/03/2027
-Volta:  permanência de 10 a 15 dias
-Preço máximo: R$ 3.200
-Escalas máximas: 1
-```
+![Formulário de cadastro de monitor: apelido "Lisboa janeiro 2027", origem GRU, destino LIS, janela de ida de 01/01/2027 a 10/01/2027, janela de volta de 20/01/2027 a 30/01/2027, preço máximo de R$ 3.000, escalas "qualquer", 1 passageiro e intervalo de 60 minutos entre buscas](images/new-monitor.png)
 
-Quando um voo cabe nesses critérios, chega uma mensagem — no WhatsApp, no e-mail, ou no log:
+> **Cadastro de monitor** — a volta é opcional e aceita duas formas: janela de datas *ou*
+> permanência em dias. O intervalo entre buscas tem **mínimo de 10 minutos**, e o porquê fica
+> escrito ao lado do campo: as fontes são gratuitas e a camada 1 devolve preço em cache, então
+> varrer mais rápido só gasta cota para reler o mesmo dado.
+
+Cada monitor mostra o que fez na última varredura — inclusive quando **não** achou nada:
+
+![Cartão do monitor GRU → LIS após uma busca sob demanda, exibindo "0 observações, 0 abaixo do teto" e "Sem alerta — nenhuma oferta abaixo do teto que se sustentasse", seguido dos quatro motivos do descarte](images/manual-search.png)
+
+> **Busca sob demanda e diagnóstico** — este é o princípio de *dizer o que não se sabe* na tela.
+> Em vez de uma lista vazia sem explicação, o sistema enumera os motivos: a fonte respondeu com o
+> código de cidade `SAO` em vez do aeroporto `GRU`, 28 ofertas caíram fora dos critérios, e nenhuma
+> das que sobraram entrou na janela pedida. Silêncio com motivo é diferente de silêncio por falha.
+
+Quando há histórico suficiente, ele vira gráfico e tabela:
+
+![Tela de histórico do monitor GRU → LIS: cartões de menor preço (R$ 3.447), preço médio (R$ 3.675), 11 observações e 1 confirmada; gráfico de barras do menor preço por data de partida com a linha tracejada do teto; e tabela de observações com data, preço, companhia ou agência, escalas, duração, fonte e horário](images/history.png)
+
+> **Histórico do monitor** — o gráfico separa o que **cabe no teto** do que está acima dele, com a
+> linha tracejada do seu limite. Na tabela, cada linha é um preço visto numa varredura, e três
+> colunas carregam decisões de projeto: **Companhia / Agência** distingue quem opera o voo de quem
+> o vende (`Iberia` é companhia, `Trip.com` é agência), **Duração** e **Escalas** só existem quando
+> a fonte informou — traço significa ausente, não zero — e **Fonte** diz se o preço veio do `cache`
+> da camada 1 ou foi `confirmado` na camada 2.
+
+Quando um voo cabe nos critérios, chega uma mensagem — no WhatsApp, no e-mail, ou no log:
 
 ```
 ✈️ Oportunidade encontrada
