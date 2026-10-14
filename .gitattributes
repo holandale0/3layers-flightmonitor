@@ -13,3 +13,11 @@
 *.ico binary
 *.jar binary
 *.zip binary
+
+# Diagramas gerados pelo archify a partir dos .json (ver diagrams/README.md).
+# O GitHub mede linguagens por bytes, e os HTML interativos (~2,5 MB) faziam o
+# projeto aparecer como majoritariamente HTML. Marcados como gerados, saem da
+# barra de linguagens e vem recolhidos nos diffs. Os SVG sao derivados tambem
+# (scripts/extrai_svg_dos_diagramas.py); ja nao contam, so ganham o recolhimento.
+diagrams/*.html linguist-generated=true
+diagrams/*.svg linguist-generated=true
