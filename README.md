@@ -1,16 +1,17 @@
 # Flight Monitor — Monitor de Preços de Passagens Aéreas
 
-**Sistema distribuído que vigia rotas aéreas em background e avisa no WhatsApp ou e-mail quando encontra uma oferta dentro do seu preço-teto — com análise estatística e decisão sobre quando realmente notificar.**
+**Sistema distribuído que vigia rotas aéreas em background e avisa no celular, no WhatsApp ou no e-mail quando encontra uma oferta dentro do seu preço-teto — com análise estatística e decisão sobre quando realmente notificar.**
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk)](https://openjdk.org)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=flat-square&logo=python)](https://www.python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vuedotjs)](https://vuejs.org)
+[![Android](https://img.shields.io/badge/Android-WebView_+_FCM-3DDC84?style=flat-square&logo=android)](./mobile-android/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=flat-square&logo=postgresql)](https://www.postgresql.org)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4-FF6600?style=flat-square&logo=rabbitmq)](https://www.rabbitmq.com)
 [![Docker](https://img.shields.io/badge/Docker_Compose-5_containers-2496ED?style=flat-square&logo=docker)](./docker-compose.yml)
-[![Testes](https://img.shields.io/badge/Testes-524_passando-success?style=flat-square)](#-qualidade)
+[![Testes](https://img.shields.io/badge/Testes-620_passando-success?style=flat-square)](#-qualidade)
 [![License](https://img.shields.io/badge/Licença-MIT-green?style=flat-square)](./LICENSE)
 
 [🎯 Motivação](#-motivação) · [🐳 Subir em 2 minutos](#-como-rodar-o-projeto) · [📐 Diagramas interativos](./diagrams/) · [📚 Documentação](#-documentação)
@@ -69,7 +70,8 @@ Quando há histórico suficiente, ele vira gráfico e tabela:
 > a fonte informou — traço significa ausente, não zero — e **Fonte** diz se o preço veio do `cache`
 > da camada 1 ou foi `confirmado` na camada 2.
 
-Quando um voo cabe nos critérios, chega uma mensagem — no WhatsApp, no e-mail, ou no log:
+Quando um voo cabe nos critérios, chega uma mensagem — no celular, no WhatsApp, no e-mail ou no
+log. Cada destinatário recebe por **todos** os canais ativos que o alcançam:
 
 ```
 ✈️ Oportunidade encontrada
@@ -86,8 +88,35 @@ Seu limite: R$ 5.000,00  (R$ 1.280,00 abaixo)
 |--------|-----------|
 | **Monitores** | Cadastro de rotas, janelas e teto, com varredura sob demanda |
 | **Histórico** | Gráfico de menor preço por data de partida, com tabela de observações |
-| **Destinatários** | Quem recebe, por telefone e/ou e-mail, com aviso de quem **não** será alcançado |
+| **Destinatários** | Quem recebe, por telefone, e-mail e/ou aparelho, com aviso de quem **não** será alcançado |
 | **Configuração** | Template e número do WhatsApp editáveis sem reiniciar o sistema |
+| **Status** | Saúde da API, do banco, do worker e dos canais de notificação |
+
+### 📱 App Android
+
+O painel inteiro também roda como app Android — o mesmo Vue, dentro de um WebView. Tudo que se faz
+no navegador se faz no app, e o app acrescenta o que o navegador não tem: **notificação push**.
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="images/app-monitores.png" alt="App no celular, tela de Monitores: monitor GRU → BEL com teto de R$ 500,00, janela de 01/12/2026 a 05/12/2026, voo direto, busca a cada 60 minutos, horário da última e da próxima busca, e os botões Buscar agora, Histórico, Editar e Excluir"></td>
+    <td align="center" width="25%"><img src="images/app-destinatarios.png" alt="App no celular, tela de Destinatários: canais ativos EMAIL e PUSH, aviso de que um destinatário não será avisado por não ter e-mail nem aparelho, e o cartão de um destinatário alcançável por EMAIL e PUSH, com o aparelho Samsung SM-G780G e os botões Testar e Remover"></td>
+    <td align="center" width="25%"><img src="images/app-push.png" alt="Notificação push chegando no topo da tela, Teste do Monitor de Passagens, enquanto o painel confirma o envio para o Samsung SM-G780G"></td>
+    <td align="center" width="25%"><img src="images/app-status.png" alt="App no celular, tela de Status do sistema: core-java, db, diskSpace, livenessState, mail, notificacao, ping, readinessState, ssl e worker, todos UP"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Monitores</b></sub></td>
+    <td align="center"><sub><b>Destinatários e aparelhos</b></sub></td>
+    <td align="center"><sub><b>Push chegando</b></sub></td>
+    <td align="center"><sub><b>Status</b></sub></td>
+  </tr>
+</table>
+
+> **Receber neste aparelho** — no cartão do destinatário, um toque pede a permissão de notificação
+> do Android, obtém o token do Firebase e registra o celular. **Testar** manda uma notificação na
+> hora, para conferir o caminho inteiro sem esperar um preço cair. Tocar num alerta abre o app
+> direto no monitor que o disparou. O painel só sabe que está dentro do app por uma ponte
+> JavaScript (`window.FlightMonitorApp`); no navegador, o botão simplesmente não aparece.
 
 ---
 
@@ -104,7 +133,8 @@ Essa mesma disciplina aparece na entrega: `ACCEPTED` (a Meta recebeu) e `DELIVER
 ## ✨ Funcionalidades
 
 - **Coleta em duas camadas** — Travelpayouts varre o mês inteiro numa chamada (barato, amplo); fast-flights confirma o candidato antes de alertar (caro, preciso). **Nada é alertado sem confirmação**
-- **Três canais de notificação** — WhatsApp Cloud API, e-mail por SMTP e log, atrás da mesma interface. Trocar de canal é uma linha no `.env`
+- **Quatro canais de notificação, vários ao mesmo tempo** — push no app Android (Firebase Cloud Messaging), WhatsApp Cloud API, e-mail por SMTP e log, atrás da mesma interface. Cada destinatário recebe por todos os canais ativos que o alcançam, e quem não é alcançado por nenhum aparece em vermelho no painel
+- **App Android** — o painel num WebView, com a senha lembrada e push nativo. Token recusado pelo Firebase (app desinstalado, dados limpos) desliga o aparelho sozinho, em vez de falhar para sempre
 - **Flight Score** — nota de 0 a 100 ponderando preço, escalas, duração, horário e companhia, com preferências por monitor
 - **Detecção de anomalia** — regra de Tukey (`p25 − 1,5 × IQR`) sobre o histórico da rota, para distinguir "barato" de "barato de verdade"
 - **Tendência de preço** — regressão de Theil–Sen, robusta a outliers, respondendo se a rota está subindo ou caindo
@@ -124,6 +154,8 @@ Essa mesma disciplina aparece na entrega: `ACCEPTED` (a Meta recebeu) e `DELIVER
 | Backend principal | Java + Spring Boot | 21 / 4.1 |
 | Worker de coleta | Python + FastAPI | 3.14 / 0.141 |
 | Frontend | Vue + Vite + TypeScript | 3.5 / 8.2 / 6.0 |
+| App Android | Kotlin + WebView + Firebase Cloud Messaging | 1.9 / Android 8+ |
+| Push no servidor | FCM HTTP v1 + google-auth-library | 1.48 |
 | Banco de dados | PostgreSQL + Flyway | 17 / 12 |
 | Mensageria | RabbitMQ | 4 |
 | Contêineres | Docker Compose | 5 serviços |
@@ -153,6 +185,7 @@ Essa mesma disciplina aparece na entrega: `ACCEPTED` (a Meta recebeu) e `DELIVER
 | `core-java/` | Java 21 + Spring Boot 4.1 | 8081 | API, agendamento, persistência, regras de alerta |
 | `worker-python/` | Python 3.14 + FastAPI | 8001 | Busca de preços e linguagem natural |
 | `frontend-vue/` | Vue 3 + Vite + TypeScript | 8090 | Painel de monitores, histórico e destinatários |
+| `mobile-android/` | Kotlin + WebView + FCM | — | O painel no celular, com notificação push |
 | PostgreSQL | Docker | 5433 | Histórico de preços |
 | RabbitMQ | Docker | 5672 · 15672 | Transporte alternativo entre core e worker |
 
@@ -160,7 +193,7 @@ Essa mesma disciplina aparece na entrega: `ACCEPTED` (a Meta recebeu) e `DELIVER
 
 1. **O Java é o dono do banco** — o worker nunca acessa o PostgreSQL. Um teste falha se alguém importar um driver de banco lá dentro
 2. **O worker é um especialista burro** — não conhece monitores nem destinatários, e não decide se um preço é bom
-3. **O canal de notificação fica atrás de uma interface** — o motor não sabe que WhatsApp existe
+3. **O canal de notificação fica atrás de uma interface** — o motor não sabe que WhatsApp ou Firebase existem
 4. **Toda fonte de preço é um provider plugável** — se uma cai, o sistema degrada em vez de morrer
 
 ### Coleta em duas camadas
@@ -176,7 +209,7 @@ Repare no último passo do diagrama: o preço confirmado **ainda pode não virar
 
 ![Ciclo de vida do alerta](diagrams/alerta.svg)
 
-`ACCEPTED` e `SENT` não são a mesma coisa. No WhatsApp o alerta para em `ACCEPTED` até o webhook da Meta chegar — *a Meta recebeu* não é *chegou no aparelho*. No e-mail não há webhook nenhum, então `SENT` quer dizer "o servidor SMTP aceitou", e é tudo que dá para afirmar com honestidade.
+`ACCEPTED` e `SENT` não são a mesma coisa. No WhatsApp o alerta para em `ACCEPTED` até o webhook da Meta chegar — *a Meta recebeu* não é *chegou no aparelho*. No e-mail não há webhook nenhum, então `SENT` quer dizer "o servidor SMTP aceitou", e é tudo que dá para afirmar com honestidade. No push vale o mesmo: `SENT` é "o Firebase aceitou para pelo menos um aparelho".
 
 ### Da observação de preço à decisão
 
@@ -189,15 +222,15 @@ Repare no último passo do diagrama: o preço confirmado **ainda pode não virar
 ## 📂 Estrutura do Projeto
 
 ```
-personal-flight-price-monitor/
+3layers-flightmonitor/
 ├── core-java/                        ← API, banco, agendamento, alertas
 │   └── src/main/java/com/flightmonitor/core/
 │       ├── monitor/                  ← entity · control · boundary
-│       ├── alert/                    ← canais: whatsapp/ · email/ · log
+│       ├── alert/                    ← canais: whatsapp/ · email/ · push/ · log
 │       ├── search/                   ← cliente do worker: REST e AMQP
 │       ├── stats/                    ← anomalia, score, tendência
 │       ├── agent/                    ← linguagem natural
-│       └── recipient/                ← quem recebe
+│       └── recipient/                ← quem recebe, e em quais aparelhos
 ├── worker-python/                    ← especialista em buscar preço
 │   └── app/
 │       ├── boundary/                 ← http/ e amqp/ (entrada) · gateway/ (saída)
@@ -207,12 +240,14 @@ personal-flight-price-monitor/
 │   └── src/
 │       ├── api/                      ← http.ts é o transporte; um módulo por recurso
 │       ├── model/                    ← domínio e funções puras
-│       ├── lib/ · composables/       ← formatação e estado reativo
+│       ├── lib/ · composables/       ← formatação, estado reativo e a ponte com o app
 │       └── views/ · components/
+├── mobile-android/                   ← app Android: WebView + Firebase Cloud Messaging
 ├── diagrams/                         ← diagramas archify (HTML interativo + SVG)
 ├── docs/                             ← plano, diário, decisões e bugs
 ├── scripts/                          ← E2E entre serviços, extração de SVG
-└── docker-compose.yml                ← os 5 containers
+├── docker-compose.yml                ← os 5 containers
+└── docker-compose.prod.yml           ← produção: banco em outra máquina, painel com senha
 ```
 
 ---
@@ -268,12 +303,14 @@ Isso troca as duas camadas de coleta por fontes falsas e deterministas. Crie um 
 
 ## 🔔 Canais de Notificação
 
-Escolha por `NOTIFICATION_CHANNEL` no `.env`. Cada nível custa mais preparo que o anterior:
+Escolha por `NOTIFICATION_CHANNELS` no `.env`, um ou vários separados por vírgula
+(`NOTIFICATION_CHANNELS=EMAIL,PUSH`). Cada nível custa mais preparo que o anterior:
 
 | Canal | O que precisa | Tempo |
 |-------|---------------|-------|
 | `LOG` *(padrão)* | nada | — |
 | `EMAIL` | uma conta Gmail dedicada e uma senha de app · [guia](docs/GUIA-EMAIL.md) | ~5 min |
+| `PUSH` | projeto gratuito no Firebase, a chave da conta de serviço no servidor e o app instalado · [guia](docs/GUIA-PUSH.md) | ~15 min |
 | `WHATSAPP` | conta Meta Business, número registrado e **template aprovado pela Meta** · [guia](docs/GUIA-WHATSAPP.md) | dias |
 
 O WhatsApp demora porque a aprovação do template é da Meta, não nossa — no desenvolvimento deste projeto levou dias e duas rejeições. **Comece pelo e-mail.**
@@ -298,6 +335,9 @@ docker compose up -d postgres rabbitmq
 # Painel em modo de desenvolvimento, na 5173 (a partir de frontend-vue/)
 npm run dev
 
+# App Android, apontando para o painel publicado (a partir de mobile-android/)
+./gradlew assembleDebug
+
 # E2E real entre os três serviços, nos dois transportes
 python scripts/e2e_servicos.py --transporte amqp
 
@@ -310,12 +350,12 @@ python scripts/extrai_svg_dos_diagramas.py
 ## 🧪 Qualidade
 
 ```bash
-cd core-java     && ./mvnw test     # 393
-cd worker-python && pytest          # 95
-cd frontend-vue  && npm test        # 36
+cd core-java     && ./mvnw test     # 439 (13 só rodam com os serviços no ar)
+cd worker-python && pytest          # 116
+cd frontend-vue  && npm test        # 78
 ```
 
-**524 testes**, e nenhum deles manda e-mail, mensagem de WhatsApp ou requisição a API paga. O SMTP é falso (GreenMail), as fontes externas têm dublês, e a suíte do Java usa o banco `flightmon_test` — **rodar os testes não apaga o que você cadastrou**.
+**620 testes passando**, e nenhum deles manda e-mail, mensagem de WhatsApp, push ou requisição a API paga. O SMTP é falso (GreenMail), o Firebase e as fontes externas têm dublês, e a suíte do Java usa o banco `flightmon_test` — **rodar os testes não apaga o que você cadastrou**.
 
 ### Arquitetura verificada, não documentada
 
@@ -339,10 +379,12 @@ Este projeto documenta o **porquê**, e não só o quê. Se algo parecer uma esc
 |---------|----------|
 | [docs/PLANO-DE-ACAO.md](docs/PLANO-DE-ACAO.md) | Escopo, arquitetura e o roteiro etapa a etapa |
 | [docs/PROGRESSO.md](docs/PROGRESSO.md) | Diário de bordo — o que foi feito, como foi testado, e o que deu errado |
-| [docs/DECISOES.md](docs/DECISOES.md) | 100 decisões e por que as alternativas foram descartadas |
+| [docs/DECISOES.md](docs/DECISOES.md) | 113 decisões e por que as alternativas foram descartadas |
 | [docs/BUGS.md](docs/BUGS.md) | Bugs com diagnóstico e lição, e riscos em observação |
 | [docs/FRAGILIDADE-CAMADA-2.md](docs/FRAGILIDADE-CAMADA-2.md) | Por que a camada 2 vai quebrar, e o plano para quando quebrar |
 | [docs/GUIA-EMAIL.md](docs/GUIA-EMAIL.md) | Canal de e-mail — o caminho mais rápido para receber alertas |
+| [docs/GUIA-PUSH.md](docs/GUIA-PUSH.md) | Firebase, app Android e alertas no celular |
+| [docs/GUIA-DEPLOY.md](docs/GUIA-DEPLOY.md) | Produção em servidores caseiros: banco numa máquina, aplicações na outra |
 | [docs/GUIA-WHATSAPP.md](docs/GUIA-WHATSAPP.md) | Credenciais do WhatsApp Cloud API |
 | [docs/GUIA-NUMERO-BRASILEIRO.md](docs/GUIA-NUMERO-BRASILEIRO.md) | Preparar e registrar o número que envia |
 | [docs/GUIA-WEBHOOK.md](docs/GUIA-WEBHOOK.md) | Receber confirmação de entrega e leitura da Meta |
@@ -359,7 +401,7 @@ Tudo em **português do Brasil**, inclusive nomes de classe e comentários.
 | **1 — Engine** | Encontrar preço, guardar histórico, alertar | ✅ |
 | **2 — Inteligência** | Estatística de rota, anomalia, tendência, Flight Score | ✅ |
 | **3 — Agente** | Criar monitores e pedir recomendação em linguagem natural | ✅ |
-| **4 — Infraestrutura** | Mensageria ✅ · containers ✅ · e-mail ✅ · configuração por tela ✅ | 🚧 observabilidade, deploy |
+| **4 — Infraestrutura** | Mensageria ✅ · containers ✅ · e-mail ✅ · configuração por tela ✅ · deploy ✅ · app Android e push ✅ | 🚧 observabilidade |
 
 ---
 
