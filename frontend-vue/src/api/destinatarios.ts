@@ -1,5 +1,5 @@
 import { del, getJson, postJson, putJson } from '@/api/http'
-import type { Recipient, RecipientRequest } from '@/model/recipient'
+import type { PushDevice, Recipient, RecipientRequest } from '@/model/recipient'
 
 /** O recurso `/recipients` do core-java: quem recebe os alertas. */
 
@@ -21,4 +21,18 @@ export function atualizarDestinatario(id: number, req: RecipientRequest): Promis
 
 export function excluirDestinatario(id: number): Promise<void> {
   return del(`/recipients/${id}`)
+}
+
+// ---------------------------------------------- aparelhos do destinatario (D-113)
+
+/**
+ * Registra este aparelho para o destinatario. Chamado pelo painel rodando no
+ * aplicativo, com o token que o app pediu ao Firebase. Registrar de novo o
+ * mesmo token atualiza — inclusive trocando de destinatario.
+ */
+export function registrarAparelho(
+  recipientId: number,
+  aparelho: { token: string; name: string },
+): Promise<PushDevice> {
+  return postJson<PushDevice>(`/recipients/${recipientId}/push-devices`, aparelho)
 }

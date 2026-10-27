@@ -40,8 +40,12 @@ class NotificacaoHealthIndicatorTest {
     }
 
     private NotificacaoHealthIndicator indicador(AlertChannel ativo, NotificationChannel... canais) {
+        return indicador(List.of(ativo), canais);
+    }
+
+    private NotificacaoHealthIndicator indicador(List<AlertChannel> ativos, NotificationChannel... canais) {
         return new NotificacaoHealthIndicator(
-                new NotificationProperties(ativo, 3, 50),
+                new NotificationProperties(ativos, 3, 50),
                 List.of(canais));
     }
 
@@ -55,7 +59,7 @@ class NotificacaoHealthIndicatorTest {
                 .health();
 
         assertThat(saude.getStatus()).isEqualTo(Status.UP);
-        assertThat(saude.getDetails()).containsEntry("canal", "EMAIL");
+        assertThat(saude.getDetails()).containsEntry("canais", List.of("EMAIL"));
         assertThat(saude.getDetails().get("disponiveis")).asInstanceOf(
                 org.assertj.core.api.InstanceOfAssertFactories.list(String.class))
                 .containsExactly("EMAIL", "LOG");
@@ -95,6 +99,33 @@ class NotificacaoHealthIndicatorTest {
                 new CanalFalso(AlertChannel.LOG, false)).health();
 
         assertThat(saude.getStatus()).isEqualTo(Status.UP);
-        assertThat(saude.getDetails()).containsEntry("canal", "LOG");
+        assertThat(saude.getDetails()).containsEntry("canais", List.of("LOG"));
+    }
+
+    @Test
+    @DisplayName("varios canais ativos aparecem todos, na ordem configurada")
+    void variosCanais() {
+        Health saude = indicador(
+                        List.of(AlertChannel.PUSH, AlertChannel.EMAIL),
+                        new CanalFalso(AlertChannel.EMAIL, false),
+                        new CanalFalso(AlertChannel.PUSH, false))
+                .health();
+
+        assertThat(saude.getStatus()).isEqualTo(Status.UP);
+        assertThat(saude.getDetails()).containsEntry("canais", List.of("PUSH", "EMAIL"));
+    }
+
+    @Test
+    @DisplayName("um canal ativo sem implementacao derruba o status, mesmo com os outros bons")
+    void umSoFaltandoDerruba() {
+        // Os alertas dos outros canais chegariam e dariam a impressao de que esta
+        // tudo bem, enquanto os deste falhariam todos.
+        Health saude = indicador(
+                        List.of(AlertChannel.EMAIL, AlertChannel.WHATSAPP),
+                        new CanalFalso(AlertChannel.EMAIL, false))
+                .health();
+
+        assertThat(saude.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(saude.getDetails()).containsEntry("semImplementacao", List.of("WHATSAPP"));
     }
 }

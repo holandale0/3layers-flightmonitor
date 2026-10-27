@@ -65,8 +65,8 @@ public class NotificationService {
         for (NotificationChannel canal : canaisDisponiveis) {
             this.canais.put(canal.canal(), canal);
         }
-        log.info("canais de notificacao disponiveis: {}; ativo: {}",
-                this.canais.keySet(), props.canal());
+        log.info("canais de notificacao disponiveis: {}; ativos: {}",
+                this.canais.keySet(), props.canais());
     }
 
     /**
@@ -211,8 +211,8 @@ public class NotificationService {
                 .toList());
     }
 
-    /** Canal configurado como ativo, gravado em cada alerta criado. */
-    public AlertChannel canalAtivo() {
-        return props.canal();
+    /** Canais configurados como ativos; cada alerta criado grava um deles. */
+    public List<AlertChannel> canaisAtivos() {
+        return props.canais();
     }
 }

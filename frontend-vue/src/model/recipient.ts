@@ -1,5 +1,22 @@
 /** Espelha os DTOs de destinatario do core-java. */
 
+import type { CanalDeNotificacao } from '@/model/health'
+
+/**
+ * Um aparelho com o aplicativo Android, que recebe pelo canal PUSH (D-113).
+ * Sem o token: ele so serve a quem envia, que e o core.
+ */
+export interface PushDevice {
+  id: number
+  recipientId: number
+  name: string
+  active: boolean
+  /** Por que foi desligado, quando o Firebase recusou o token. */
+  lastError: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface Recipient {
   id: number
   name: string
@@ -10,6 +27,8 @@ export interface Recipient {
   active: boolean
   createdAt: string | null
   updatedAt: string | null
+  /** Aparelhos com o aplicativo. Cadastrados pelo app, nao pelo formulario. */
+  pushDevices: PushDevice[]
 }
 
 /**
@@ -60,11 +79,36 @@ export function contatosDe(r: Recipient): string {
   return [r.phoneE164, r.email].filter(Boolean).join(' · ')
 }
 
-/** Este destinatario pode ser alcancado pelo canal ativo? */
-export function alcancavelPor(r: Recipient, canal: 'WHATSAPP' | 'EMAIL' | 'LOG'): boolean {
+/** Este destinatario pode ser alcancado por este canal? Espelha AlcanceDosCanais. */
+export function alcancavelPor(r: Recipient, canal: CanalDeNotificacao): boolean {
   if (canal === 'EMAIL') return Boolean(r.email)
   if (canal === 'WHATSAPP') return Boolean(r.phoneE164)
+  if (canal === 'PUSH') return (r.pushDevices ?? []).some((d) => d.active)
   return true
+}
+
+/**
+ * Nenhum dos canais ativos chega a esta pessoa.
+ *
+ * E o caso que importa avisar: com varios canais, faltar UM contato e normal —
+ * quem nao tem o app recebe por e-mail. Faltar todos e alerta perdido.
+ */
+export function inalcancavel(r: Recipient, canais: CanalDeNotificacao[]): boolean {
+  return canais.length > 0 && !canais.some((c) => alcancavelPor(r, c))
+}
+
+/** O que falta cadastrar para o canal alcancar alguem, em portugues. */
+export function contatoDoCanal(canal: CanalDeNotificacao): string {
+  switch (canal) {
+    case 'EMAIL':
+      return 'e-mail'
+    case 'WHATSAPP':
+      return 'telefone'
+    case 'PUSH':
+      return 'aparelho com o aplicativo'
+    case 'LOG':
+      return 'nada'
+  }
 }
 
 function vazioViraNulo(valor: string | null): string | null {

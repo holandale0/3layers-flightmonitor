@@ -123,7 +123,7 @@ class E2EServicosTest {
                 () -> System.getProperty("e2e.worker.url", "http://localhost:8002"));
         // O canal de entrega continua sendo o LOG. O objetivo aqui e o contrato
         // entre Java e Python; a Meta nao entra nesta fronteira.
-        registry.add("flightmonitor.notification.canal", () -> "LOG");
+        registry.add("flightmonitor.notification.canais", () -> "LOG");
 
         // O TRANSPORTE e parametro desde a E4.1, e a suite inteira roda nos
         // dois. Nenhum teste abaixo sabe qual esta ativo — e esse e exatamente

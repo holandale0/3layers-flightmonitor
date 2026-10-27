@@ -1,0 +1,17 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+# A configuracao do Firebase identifica o SEU projeto, e este repositorio e
+# publico. Cada um baixa a sua do console. Ver docs/GUIA-PUSH.md.
+app/google-services.json
+*.jks
+# gradle-wrapper.jar E versionado de proposito: sem ele o ./gradlew nao funciona
+# para quem clona o repositorio.

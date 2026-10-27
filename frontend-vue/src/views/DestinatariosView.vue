@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { excluirDestinatario, listarDestinatarios } from '@/api/destinatarios'
+import { removerAparelho, testarAparelho } from '@/api/aparelhos'
+import { excluirDestinatario, listarDestinatarios, registrarAparelho } from '@/api/destinatarios'
 import { verificarSaude } from '@/api/saude'
 import DestinatarioForm from '@/components/DestinatarioForm.vue'
 import { mensagemDeErro, useCarregamento } from '@/composables/useCarregamento'
+import { emAplicativo, nomeDoAparelho, obterTokenDePush, pushDisponivel } from '@/lib/app'
 import { instante } from '@/lib/formato'
 import type { CanalDeNotificacao } from '@/model/health'
-import type { Recipient } from '@/model/recipient'
-import { alcancavelPor, contatosDe } from '@/model/recipient'
+import type { PushDevice, Recipient } from '@/model/recipient'
+import { alcancavelPor, contatoDoCanal, contatosDe, inalcancavel } from '@/model/recipient'
 
 const { dados, carregando, erro, executar: carregar } = useCarregamento(() =>
   listarDestinatarios(),
@@ -21,31 +23,35 @@ const editorAberto = ref(false)
 const emEdicao = ref<Recipient | null>(null)
 
 /**
- * O canal de notificacao ativo, lido do Actuator.
+ * Os canais de notificacao ativos, lidos do Actuator.
  *
- * Serve para uma coisa so, mas que nenhuma outra tela consegue mostrar: avisar
- * que alguem cadastrado NAO vai ser alcancado. Um destinatario so com e-mail,
- * com o sistema em WHATSAPP, e um alerta que falha em silencio — o envio vira
- * falha permanente e a pessoa nunca sabe que perdeu a passagem.
+ * Servem para uma coisa so, mas que nenhuma outra tela consegue mostrar: avisar
+ * que alguem cadastrado NAO vai ser alcancado. Com varios canais (D-113), o que
+ * importa e quem nao e alcancado por NENHUM — esse perde a passagem em silencio.
  */
-const canal = ref<CanalDeNotificacao | null>(null)
+const canais = ref<CanalDeNotificacao[]>([])
 
-const inalcancaveis = computed(() => {
-  const ativo = canal.value
-  return ativo === null
-    ? []
-    : destinatarios.value.filter((d) => d.active && !alcancavelPor(d, ativo))
-})
+const inalcancaveis = computed(() =>
+  destinatarios.value.filter((d) => d.active && inalcancavel(d, canais.value)),
+)
+
+/** O botao de push so aparece dentro do app gerado com o Firebase. */
+const oferecerPush = emAplicativo() && pushDisponivel()
+const pushAtivo = computed(() => canais.value.includes('PUSH'))
+
+/** Qual acao esta em andamento: `registrar-<destinatario>` ou `testar-<aparelho>`. */
+const ocupado = ref<string | null>(null)
+const aviso = ref<string | null>(null)
 
 onMounted(async () => {
   await carregar()
   try {
     const saude = await verificarSaude()
-    canal.value = saude.components?.notificacao?.details?.canal ?? null
+    canais.value = saude.components?.notificacao?.details?.canais ?? []
   } catch {
-    // Sem o canal, a tela funciona igual — so nao mostra o aviso. Nao vale
+    // Sem os canais, a tela funciona igual — so nao mostra o aviso. Nao vale
     // travar o cadastro por causa de um indicador.
-    canal.value = null
+    canais.value = []
   }
 })
 
@@ -81,6 +87,61 @@ async function excluir(d: Recipient) {
     erro.value = mensagemDeErro(e, 'Erro ao excluir')
   }
 }
+
+/**
+ * "Receber neste aparelho": o app pede a permissao e o token ao Firebase, e o
+ * painel registra pela API — o mesmo caminho de qualquer outro cadastro.
+ */
+async function receberNesteAparelho(d: Recipient) {
+  ocupado.value = `registrar-${d.id}`
+  aviso.value = null
+  erro.value = null
+  try {
+    const token = await obterTokenDePush(d.id)
+    await registrarAparelho(d.id, { token, name: nomeDoAparelho() })
+    await carregar()
+    aviso.value = pushAtivo.value
+      ? `Este aparelho passa a receber os alertas de ${d.name}. Use "Testar" para conferir.`
+      : `Aparelho registrado para ${d.name}, mas o canal PUSH não está ativo no servidor: ` +
+        'inclua PUSH em NOTIFICATION_CHANNELS para os alertas chegarem aqui.'
+  } catch (e) {
+    erro.value = mensagemDeErro(e, 'Não foi possível registrar o aparelho')
+  } finally {
+    ocupado.value = null
+  }
+}
+
+async function testar(a: PushDevice) {
+  ocupado.value = `testar-${a.id}`
+  aviso.value = null
+  erro.value = null
+  try {
+    const r = await testarAparelho(a.id)
+    if (r.enviado) {
+      aviso.value = `Notificação de teste enviada para ${a.name}.`
+    } else {
+      erro.value = `O teste para ${a.name} falhou: ${r.erro}`
+    }
+    // O teste pode ter desligado o aparelho, se o Firebase recusou o token.
+    await carregar()
+  } catch (e) {
+    erro.value = mensagemDeErro(e, 'Erro ao testar')
+  } finally {
+    ocupado.value = null
+  }
+}
+
+async function remover(a: PushDevice) {
+  if (!confirm(`Remover o aparelho "${a.name}"? Ele deixa de receber alertas por push.`)) {
+    return
+  }
+  try {
+    await removerAparelho(a.id)
+    await carregar()
+  } catch (e) {
+    erro.value = mensagemDeErro(e, 'Erro ao remover')
+  }
+}
 </script>
 
 <template>
@@ -90,7 +151,10 @@ async function excluir(d: Recipient) {
         <h1>Destinatários</h1>
         <p class="subtitulo">
           {{ destinatarios.length }} cadastrado(s), {{ ativos }} ativo(s)
-          <template v-if="canal"> · canal ativo: <code>{{ canal }}</code></template>
+          <template v-if="canais.length">
+            · {{ canais.length === 1 ? 'canal ativo' : 'canais ativos' }}:
+            <code v-for="c in canais" :key="c" class="canal">{{ c }}</code>
+          </template>
         </p>
       </div>
       <button v-if="!editorAberto" type="button" @click="novo">Novo destinatário</button>
@@ -105,16 +169,16 @@ async function excluir(d: Recipient) {
     </div>
 
     <p v-if="erro" class="erro">{{ erro }}</p>
+    <p v-if="aviso" class="aviso">{{ aviso }}</p>
 
-    <div v-if="inalcancaveis.length && canal" class="alerta-canal">
+    <div v-if="inalcancaveis.length" class="alerta-canal">
       <strong>{{ inalcancaveis.length }} destinatário(s) ativo(s) não serão avisados.</strong>
-      O canal do sistema é <code>{{ canal }}</code>, e
       {{ inalcancaveis.map((d) => d.name).join(', ') }}
       não {{ inalcancaveis.length === 1 ? 'tem' : 'têm' }}
-      {{ canal === 'EMAIL' ? 'e-mail' : 'telefone' }} cadastrado.
+      {{ canais.map(contatoDoCanal).join(' nem ') }} cadastrado.
     </div>
 
-    <p v-if="carregando" class="msg">Carregando...</p>
+    <p v-if="carregando && !dados" class="msg">Carregando...</p>
 
     <p v-else-if="destinatarios.length === 0 && !editorAberto" class="msg">
       Nenhum destinatário cadastrado. Sem pelo menos um, os monitores funcionam mas não avisam
@@ -133,9 +197,9 @@ async function excluir(d: Recipient) {
             <strong class="nome">{{ d.name }}</strong>
             <span v-if="!d.active" class="etiqueta">inativo</span>
             <span
-              v-else-if="canal && !alcancavelPor(d, canal)"
+              v-else-if="inalcancavel(d, canais)"
               class="etiqueta perigo"
-              :title="`O canal ativo é ${canal} e falta esse contato`"
+              title="Nenhum dos canais ativos tem como chegar a esta pessoa"
             >
               não recebe
             </span>
@@ -143,10 +207,55 @@ async function excluir(d: Recipient) {
           <code class="contatos">{{ contatosDe(d) }}</code>
         </div>
 
+        <!-- Por onde cada canal ativo chega a esta pessoa. Com um canal so, a
+             etiqueta "não recebe" bastava; com varios, faltar um e normal. -->
+        <p v-if="d.active && canais.length > 1" class="alcance">
+          <span
+            v-for="c in canais"
+            :key="c"
+            :class="alcancavelPor(d, c) ? 'sim' : 'nao'"
+            :title="alcancavelPor(d, c) ? `Recebe por ${c}` : `Falta ${contatoDoCanal(c)}`"
+          >
+            {{ alcancavelPor(d, c) ? '✓' : '✗' }} {{ c }}
+          </span>
+        </p>
+
+        <ul v-if="d.pushDevices.length" class="aparelhos">
+          <li v-for="a in d.pushDevices" :key="a.id" :class="{ desligado: !a.active }">
+            <span class="aparelho">
+              📱 {{ a.name }}
+              <small v-if="!a.active" :title="a.lastError ?? ''">
+                · desligado{{ a.lastError ? ': o Firebase recusou o token' : '' }}
+              </small>
+            </span>
+            <span class="acoes-aparelho">
+              <button
+                v-if="a.active"
+                type="button"
+                class="secundario"
+                :disabled="ocupado !== null"
+                @click="testar(a)"
+              >
+                {{ ocupado === `testar-${a.id}` ? 'Enviando...' : 'Testar' }}
+              </button>
+              <button type="button" class="perigo" @click="remover(a)">Remover</button>
+            </span>
+          </li>
+        </ul>
+
         <p class="rodape">Cadastrado em {{ instante(d.createdAt) }}</p>
 
         <div class="acoes">
           <button type="button" class="secundario" @click="editar(d)">Editar</button>
+          <button
+            v-if="oferecerPush && d.active"
+            type="button"
+            class="secundario"
+            :disabled="ocupado !== null"
+            @click="receberNesteAparelho(d)"
+          >
+            {{ ocupado === `registrar-${d.id}` ? 'Registrando...' : 'Receber neste aparelho' }}
+          </button>
           <button type="button" class="perigo" @click="excluir(d)">Excluir</button>
         </div>
       </li>
@@ -160,6 +269,8 @@ async function excluir(d: Recipient) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  /* No celular o botao desce para baixo do titulo, em vez de espreme-lo. */
+  flex-wrap: wrap;
   margin-bottom: 1.5rem;
 }
 
@@ -172,6 +283,10 @@ h1 {
   margin: 0.15rem 0 0;
   color: var(--texto-suave);
   font-size: 0.85rem;
+}
+
+.canal + .canal {
+  margin-left: 0.3rem;
 }
 
 .lista {
@@ -208,6 +323,7 @@ h1 {
 .contatos {
   color: var(--texto-suave);
   font-size: 0.85rem;
+  word-break: break-all;
 }
 
 .etiqueta {
@@ -241,6 +357,61 @@ h1 {
   margin-bottom: 0.2rem;
 }
 
+.alcance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+}
+
+.alcance .sim {
+  color: var(--ok);
+}
+
+.alcance .nao {
+  color: var(--texto-suave);
+}
+
+.aparelhos {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.aparelhos li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  background: var(--realce);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+}
+
+.aparelhos li.desligado .aparelho {
+  color: var(--texto-suave);
+}
+
+.aparelhos small {
+  color: var(--falha);
+}
+
+.acoes-aparelho {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.acoes-aparelho button {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+}
+
 .rodape {
   margin: 0.6rem 0 0;
   font-size: 0.78rem;
@@ -249,8 +420,38 @@ h1 {
 
 .acoes {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.8rem;
+}
+
+/* Os mesmos botoes da tela de monitores: o estilo e scoped em cada view. */
+button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--acento);
+  color: white;
+  cursor: pointer;
+}
+
+button.secundario {
+  background: transparent;
+  border-color: var(--borda);
+  color: inherit;
+}
+
+button.perigo {
+  background: transparent;
+  border-color: var(--borda);
+  color: var(--falha);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .msg {
@@ -259,5 +460,9 @@ h1 {
 
 .erro {
   color: var(--falha);
+}
+
+.aviso {
+  color: var(--ok);
 }
 </style>

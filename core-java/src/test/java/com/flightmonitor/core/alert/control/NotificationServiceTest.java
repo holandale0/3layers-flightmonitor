@@ -325,8 +325,8 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("o canal ativo configurado e o que os alertas novos recebem")
-    void canalAtivoConfigurado() {
-        assertThat(service.canalAtivo()).isEqualTo(props.canal());
+    @DisplayName("os canais ativos configurados sao os que os alertas novos recebem")
+    void canaisAtivosConfigurados() {
+        assertThat(service.canaisAtivos()).isEqualTo(props.canais());
     }
 }

@@ -95,7 +95,15 @@ services:
       CANARIO_INTERVAL: ${CANARIO_INTERVAL:-PT24H}
       CANARIO_INITIAL_DELAY: ${CANARIO_INITIAL_DELAY:-PT2M}
 
-      NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-LOG}
+      # Canais ativos, separados por virgula (D-113): EMAIL,PUSH. Cai no
+      # NOTIFICATION_CHANNEL antigo, e so depois em LOG. A cadeia mora AQUI, e
+      # nao so no application.yml, de proposito: variavel definida e vazia
+      # nao e ausencia para o Spring — ele leria uma lista vazia, cairia em LOG,
+      # e os alertas parariam de sair sem erro nenhum.
+      NOTIFICATION_CHANNELS: ${NOTIFICATION_CHANNELS:-${NOTIFICATION_CHANNEL:-LOG}}
+      # Caminho DENTRO do container do JSON da conta de servico do Firebase.
+      # Vazio = canal PUSH recusa envios, o resto segue. Ver docs/GUIA-PUSH.md.
+      FCM_CREDENCIAIS: ${FCM_CREDENCIAIS:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_WABA_ID: ${WHATSAPP_WABA_ID:-}

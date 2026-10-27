@@ -41,3 +41,6 @@ Desktop.ini
 # Logs
 *.log
 logs/
+
+# Chave da conta de servico do Firebase (D-113) e afins. Nunca versionar.
+segredos/

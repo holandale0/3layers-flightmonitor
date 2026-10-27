@@ -15,6 +15,15 @@ public enum AlertChannel {
      */
     EMAIL,
 
+    /**
+     * Notificacao no aplicativo Android, pelo Firebase Cloud Messaging (V11).
+     *
+     * <p>Passa pelo Google, mas sem template para aprovar e sem caixa de spam:
+     * as duas coisas que ja atrasaram ou esconderam alerta nos outros canais.
+     * Ver D-113.
+     */
+    PUSH,
+
     /** Adaptador de desenvolvimento: apenas registra no log (etapa E1.11). */
     LOG
 }

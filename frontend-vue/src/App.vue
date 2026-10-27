@@ -62,4 +62,34 @@ main {
   max-width: 56rem;
   margin: 0 auto;
 }
+
+/*
+ * Celular — e o aplicativo Android, que e este mesmo painel num WebView (D-113).
+ *
+ * Os quatro links nao cabem ao lado da marca numa tela de 360px. Em vez de
+ * esconder atras de um menu, que poe um toque a mais em toda navegacao, a barra
+ * vira duas linhas e os links dividem a largura igualmente.
+ */
+@media (max-width: 40rem) {
+  .barra {
+    padding: 0.6rem 0.75rem;
+    gap: 0.4rem;
+  }
+
+  nav {
+    width: 100%;
+    gap: 0.2rem;
+  }
+
+  nav a {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem 0.2rem;
+    font-size: 0.82rem;
+  }
+
+  main {
+    padding: 1.25rem 1rem 3rem;
+  }
+}
 </style>

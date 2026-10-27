@@ -24,6 +24,27 @@ public class AlertMessageFormatter {
     private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Locale BR = Locale.of("pt", "BR");
 
+    /**
+     * Uma linha com rota e preco: o assunto do e-mail e o titulo do push.
+     *
+     * <p>Precisa <b>variar</b> a cada alerta. O Gmail agrupa mensagens de
+     * assunto identico na mesma conversa, e com assunto fixo o quinto alerta
+     * apareceria colapsado dentro de uma thread velha (D-098). E e a linha que
+     * aparece <b>na notificacao do celular</b>, sem abrir nada — para um
+     * sistema que existe para avisar, a tela que mais importa.
+     */
+    public static String titulo(PriceObservation oferta) {
+        if (oferta == null) {
+            // Alerta sem observacao nao deveria existir, mas titulo vazio faria
+            // o e-mail parecer spam. Melhor generico do que em branco.
+            return "Oportunidade de passagem encontrada";
+        }
+        String preco = oferta.getPrice() == null
+                ? "preco indisponivel"
+                : dinheiro(oferta.getPrice(), oferta.getCurrency());
+        return "✈ %s → %s por %s".formatted(oferta.getOrigin(), oferta.getDestination(), preco);
+    }
+
     /** Sem enriquecimento — usado por quem nao tem a analise em maos. */
     public String formatar(Monitor monitor, PriceObservation oferta) {
         return formatar(monitor, oferta, AlertInsights.vazio());
@@ -231,7 +252,7 @@ public class AlertMessageFormatter {
         };
     }
 
-    private String dinheiro(BigDecimal valor, String moeda) {
+    private static String dinheiro(BigDecimal valor, String moeda) {
         if ("BRL".equals(moeda)) {
             return NumberFormat.getCurrencyInstance(BR).format(valor);
         }

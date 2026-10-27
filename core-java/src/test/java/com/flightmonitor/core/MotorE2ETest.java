@@ -146,7 +146,7 @@ class MotorE2ETest {
     static void apontarParaOWorkerFalso(DynamicPropertyRegistry registry) {
         registry.add("flightmonitor.worker.base-url", () -> "http://localhost:" + worker.port());
         // Trava de seguranca: nunca mandar mensagem de verdade a partir da suite.
-        registry.add("flightmonitor.notification.canal", () -> "LOG");
+        registry.add("flightmonitor.notification.canais", () -> "LOG");
     }
 
     /**

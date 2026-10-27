@@ -1,5 +1,6 @@
 package com.flightmonitor.core.alert.control;
 
+import com.flightmonitor.core.alert.entity.AlertChannel;
 import com.flightmonitor.core.alert.entity.AlertRepository;
 import com.flightmonitor.core.alert.entity.Alert;
 
@@ -57,6 +58,7 @@ public class AlertService {
     private final AlertMessageFormatter formatador;
     private final AlertProperties props;
     private final NotificationProperties notificacao;
+    private final AlcanceDosCanais alcance;
     private final RouteStatsService estatisticas;
     private final PriceAnomalyService anomalias;
     private final FlightScoreService score;
@@ -68,6 +70,7 @@ public class AlertService {
             AlertMessageFormatter formatador,
             AlertProperties props,
             NotificationProperties notificacao,
+            AlcanceDosCanais alcance,
             RouteStatsService estatisticas,
             PriceAnomalyService anomalias,
             FlightScoreService score) {
@@ -77,6 +80,7 @@ public class AlertService {
         this.formatador = formatador;
         this.props = props;
         this.notificacao = notificacao;
+        this.alcance = alcance;
         this.estatisticas = estatisticas;
         this.anomalias = anomalias;
         this.score = score;
@@ -117,16 +121,16 @@ public class AlertService {
             return antiSpam;
         }
 
-        criarAlertas(monitor, oferta, destinatarios);
+        int criados = criarAlertas(monitor, oferta, destinatarios);
 
-        log.info("monitor {}: alerta criado para {} destinatario(s) a {} ({})",
-                monitor.getId(), destinatarios.size(), oferta.getPrice(), antiSpam.detalhe());
+        log.info("monitor {}: {} alerta(s) criado(s) para {} destinatario(s) a {} ({})",
+                monitor.getId(), criados, destinatarios.size(), oferta.getPrice(), antiSpam.detalhe());
 
         // Preserva o motivo do anti-spam: saber que alertamos e menos util do
         // que saber POR QUE — se foi o primeiro alerta, se as datas eram novas
         // ou se houve queda relevante.
         return AlertDecision.alertar("%s; %d alerta(s) criado(s) a %s"
-                .formatted(antiSpam.detalhe(), destinatarios.size(), oferta.getPrice()));
+                .formatted(antiSpam.detalhe(), criados, oferta.getPrice()));
     }
 
     /**
@@ -197,25 +201,29 @@ public class AlertService {
                 .divide(anterior, 2, RoundingMode.HALF_UP);
     }
 
-    private void criarAlertas(Monitor monitor, PriceObservation oferta, List<Recipient> destinatarios) {
+    private int criarAlertas(Monitor monitor, PriceObservation oferta, List<Recipient> destinatarios) {
         AlertInsights analise = analisar(monitor, oferta);
         String mensagem = formatador.formatar(monitor, oferta, analise);
 
-        List<Alert> novos = new ArrayList<>(destinatarios.size());
+        List<Alert> novos = new ArrayList<>();
         for (Recipient destinatario : destinatarios) {
-            // Uma linha por destinatario: se a entrega falhar para uma pessoa e
-            // funcionar para as outras, isso precisa ficar registrado.
-            Alert alerta = new Alert(monitor, oferta, destinatario, mensagem);
-            // O alerta registra o que sabia no momento da decisao. Ver V5.
-            alerta.registrarAnalise(
-                    analise.nota(), analise.grau(), analise.quedaPercentual());
-            // O canal fica gravado no alerta, e nao so na configuracao: trocar o
-            // canal depois nao pode reescrever a historia de como um alerta
-            // antigo foi entregue.
-            alerta.setChannel(notificacao.canal());
-            novos.add(alerta);
+            // Uma linha por destinatario E por canal (D-113): se o e-mail chegar
+            // e o push falhar, isso precisa ficar registrado — com um registro
+            // so, uma entrega apagaria a outra.
+            for (AlertChannel canal : alcance.canaisPara(destinatario, notificacao.canais())) {
+                Alert alerta = new Alert(monitor, oferta, destinatario, mensagem);
+                // O alerta registra o que sabia no momento da decisao. Ver V5.
+                alerta.registrarAnalise(
+                        analise.nota(), analise.grau(), analise.quedaPercentual());
+                // O canal fica gravado no alerta, e nao so na configuracao: trocar
+                // o canal depois nao pode reescrever a historia de como um alerta
+                // antigo foi entregue.
+                alerta.setChannel(canal);
+                novos.add(alerta);
+            }
         }
         alertas.saveAll(novos);
+        return novos.size();
     }
 
     /**

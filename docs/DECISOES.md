@@ -1837,6 +1837,70 @@ estiver ligada. Um monitor de 6 em 6 horas perde a madrugada com o PC desligado 
 existe justamente para vigiar quando ninguém está olhando. O histórico não se perde: o próximo
 horário fica no banco, e ao religar o scheduler encontra os vencidos.
 
+### D-112 · Banco no lab, aplicação no prod, publicada pelo Funnel ✅ *(substitui a [D-111](DECISOES.md))*
+
+**Contexto (2026-10-23):** o usuário montou dois servidores caseiros com notebooks antigos e
+convencionou que o `lab` (Dell) guarda os dados e o `prod` (MacBook) roda as aplicações. A D-111
+assumia o PC dele ligado, com o defeito declarado de perder as madrugadas.
+
+**Decisão:**
+
+- **Banco no Postgres compartilhado do `lab`**, num banco e usuário próprios (`flightmon`),
+  criados por `dell-lab/91-banco-da-aplicacao.sh` do repositório de infraestrutura. O backup
+  diário do `lab` já cobre bancos novos sem configuração.
+- **Core, worker e painel no `prod`**, em `/srv/apps/flightmonitor`. O Postgres e o RabbitMQ do
+  compose base ficam num perfil que ninguém liga: o transporte segue REST (D-087), e um broker
+  parado sem ninguém publicando seria só mais uma peça para cair.
+- **Publicado pelo Tailscale Funnel na porta 10000**, a última livre (443 é do `hello`, 8443 do
+  tour-guide). O painel continua com a senha no nginx da D-111.
+- **O core conecta pelo IP do Tailscale do `lab`**, e não pelo nome: o nome do nó pode mudar.
+
+**O túnel Cloudflare sai.** Ele existia para contornar CGNAT e dar HTTPS a uma máquina doméstica;
+o Funnel faz as duas coisas sem domínio próprio.
+
+**Os dados do PC vieram junto:** 6 monitores, 3 destinatários, 7.626 observações e o histórico
+de alertas, por `pg_dump`/`pg_restore`. O anti-spam respeitou o histórico migrado na primeira
+varredura — sem ele, a mesma oferta teria sido alertada de novo.
+
+**Custo aceito:** cair o `lab` derruba o banco do `prod`, inclusive no reboot automático diário
+(~70 s). O core reconecta sozinho, e o scheduler pega os monitores vencidos.
+
+### D-113 · Push no aplicativo, e vários canais ao mesmo tempo ✅
+
+**Contexto:** o usuário pediu um app Android no molde do tour-guide (WebView) e uma nova
+modalidade de alerta direto no app.
+
+**Decisões, cada uma com a alternativa recusada:**
+
+- **O app é o painel num WebView**, e não telas nativas. Tudo que o painel faz, o app faz, sem
+  segunda implementação para manter em dia. Vue ou Angular não muda nada: o WebView roda o
+  JavaScript que o navegador rodaria. A única ponte é `window.FlightMonitorApp`, que responde só
+  o que o navegador não sabe — o token de push e o nome do aparelho.
+- **Firebase Cloud Messaging**, e não polling nem ntfy. Polling atrasaria horas com a tela
+  desligada (o Android adia trabalho em segundo plano); ntfy seria mais um serviço para manter
+  no `prod`. O FCM entrega em segundos e é grátis.
+- **Só `google-auth-library` no core**, e não o `firebase-admin`: o envio é um POST na API HTTP
+  v1, feito com o mesmo `RestClient` do WhatsApp. O SDK traria gRPC e Firestore de carona.
+- **Vários canais ativos** (`NOTIFICATION_CHANNELS=EMAIL,PUSH`), e não mais um só. Um alerta
+  vira **uma linha por destinatário e por canal**: se o e-mail chega e o push falha, os dois
+  fatos ficam registrados. O anti-spam continua olhando o monitor, e não o canal — senão cada
+  canal teria cooldown próprio.
+- **Só cria alerta pelo canal que alcança a pessoa** (`AlcanceDosCanais`). Com vários canais,
+  quem não tem o app ganharia um alerta PUSH falhado a cada oferta — ruído que esconde a falha
+  que importa. **Se nenhum canal alcança, cria em todos**, para a falha ficar registrada em vez
+  de o alerta simplesmente não existir.
+- **O aparelho é um contato do destinatário** (`push_device`), como telefone e e-mail, mas
+  várias por pessoa. Basta um aparelho receber para o alerta contar como entregue.
+- **Token morto desliga o aparelho, erro nosso não.** `UNREGISTERED` e `SENDER_ID_MISMATCH`
+  desligam, com o motivo gravado. `INVALID_ARGUMENT` só desliga se a mensagem falar do token: o
+  mesmo código vale para payload malformado, e desligar por ele apagaria, um a um, todos os
+  celulares.
+- **SENT, e não ACCEPTED**: o FCM não avisa quando a notificação aparece, então não há webhook
+  para esperar.
+
+**`NOTIFICATION_CHANNEL`, no singular, segue valendo.** Um `.env` antigo não muda de
+comportamento sem ninguém mexer nele.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

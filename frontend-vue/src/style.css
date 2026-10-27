@@ -41,3 +41,18 @@ code {
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
 }
+
+/*
+ * Celular. Os botoes nao tem estilo de tamanho proprio, e o padrao do navegador
+ * (~30px) fica abaixo do que um dedo acerta sem errar o vizinho. 2.5rem = 40px,
+ * perto dos 48dp que o Android recomenda, sem inflar a tela inteira.
+ */
+@media (max-width: 40rem) {
+  button {
+    min-height: 2.5rem;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+  }
+}

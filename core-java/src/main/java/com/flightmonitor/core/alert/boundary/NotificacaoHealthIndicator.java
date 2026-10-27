@@ -11,16 +11,16 @@ import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
 /**
- * Expoe qual canal de notificacao esta ativo em {@code /actuator/health}.
+ * Expoe quais canais de notificacao estao ativos em {@code /actuator/health}.
  *
  * <h2>Por que isto existe</h2>
  *
- * O canal ativo e a unica configuracao do sistema que muda o que o usuario
+ * Os canais ativos sao a unica configuracao do sistema que muda o que o usuario
  * <b>recebe</b>, e ate aqui ela so era visivel numa linha de log da subida.
  *
  * <p>Foi a tela de destinatarios que cobrou: para avisar que alguem cadastrado
  * <b>nao vai ser alcancado</b> — um destinatario so com e-mail, com o sistema em
- * {@code WHATSAPP} — o painel precisa saber qual canal esta ativo. Sem isso o
+ * {@code WHATSAPP} — o painel precisa saber quais canais estao ativos. Sem isso o
  * aviso nao teria como existir, e o alerta falharia em silencio: envio vira
  * falha permanente, e a pessoa nunca sabe que perdeu a passagem.
  *
@@ -45,20 +45,29 @@ public class NotificacaoHealthIndicator implements HealthIndicator {
 
     @Override
     public Health health() {
-        AlertChannel ativo = props.canal();
+        List<AlertChannel> ativos = props.canais();
 
-        boolean implementado = canais.stream().anyMatch(c -> c.canal() == ativo);
+        // Cada ativo precisa de implementacao. Um so faltando ja e erro de
+        // verdade: os alertas daquele canal falhariam todos, enquanto os dos
+        // outros chegariam e dariam a impressao de que esta tudo bem.
+        List<String> semImplementacao = ativos.stream()
+                .filter(ativo -> canais.stream().noneMatch(c -> c.canal() == ativo))
+                .map(AlertChannel::name)
+                .toList();
 
-        Health.Builder saude = implementado ? Health.up() : Health.down();
+        Health.Builder saude = semImplementacao.isEmpty() ? Health.up() : Health.down();
+        if (!semImplementacao.isEmpty()) {
+            saude.withDetail("semImplementacao", semImplementacao);
+        }
 
         return saude
-                .withDetail("canal", ativo.name())
+                .withDetail("canais", ativos.stream().map(AlertChannel::name).toList())
                 .withDetail("disponiveis", canais.stream().map(c -> c.canal().name()).sorted().toList())
                 // Quem le o painel precisa saber se o alerta vai esperar
                 // confirmacao externa: no WhatsApp o alerta para em ACCEPTED ate
-                // o webhook chegar; no e-mail, SENT e o fim da linha.
+                // o webhook chegar; no e-mail e no push, SENT e o fim da linha.
                 .withDetail("confirmacaoAssincrona", canais.stream()
-                        .filter(c -> c.canal() == ativo)
+                        .filter(c -> ativos.contains(c.canal()))
                         .anyMatch(NotificationChannel::confirmacaoAssincrona))
                 .build();
     }

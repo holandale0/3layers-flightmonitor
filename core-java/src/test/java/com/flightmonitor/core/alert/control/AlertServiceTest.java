@@ -336,7 +336,7 @@ class AlertServiceTest {
         assertThat(a.getRecipient()).isNotNull();
         // O canal gravado e o configurado, nao um valor fixo: trocar o canal
         // depois nao pode reescrever como um alerta antigo foi entregue.
-        assertThat(a.getChannel()).isEqualTo(notificacao.canal());
+        assertThat(a.getChannel()).isIn(notificacao.canais());
         assertThat(a.getCreatedAt()).isNotNull();
         assertThat(a.getAttempts()).isZero();
     }

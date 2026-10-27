@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- As mesmas cores do painel (frontend-vue/src/style.css): o app e o painel
+     precisam parecer uma coisa so, e nao uma moldura em volta de um site. -->
+<resources>
+    <color name="primary">#2563EB</color>
+    <color name="primary_dark">#1D4ED8</color>
+    <color name="accent">#3B82F6</color>
+    <color name="white">#FFFFFF</color>
+    <color name="fundo">#FFFFFF</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="text_primary">#1C1E21</color>
+    <color name="text_secondary">#6B7280</color>
+</resources>

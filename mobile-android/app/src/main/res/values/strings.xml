@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">Flight Monitor</string>
+
+    <string name="error_title">Sem conexão</string>
+    <string name="error_message">Não foi possível abrir o painel. Verifique a internet e tente de novo.</string>
+    <string name="error_retry">Tentar novamente</string>
+
+    <string name="login_titulo">Entrar no painel</string>
+    <string name="login_mensagem">Use o usuário e a senha do painel (PAINEL_USUARIO e PAINEL_SENHA do servidor). Eles ficam salvos neste aparelho.</string>
+    <string name="login_recusado">O servidor recusou a senha salva. Digite de novo.</string>
+    <string name="login_usuario">Usuário</string>
+    <string name="login_senha">Senha</string>
+    <string name="login_entrar">Entrar</string>
+    <string name="login_cancelar">Cancelar</string>
+
+    <!-- O id precisa bater com FcmClient.CANAL_ANDROID, no core. -->
+    <string name="canal_alertas_id" translatable="false">alertas</string>
+    <string name="canal_alertas_nome">Alertas de passagem</string>
+    <string name="canal_alertas_descricao">Avisa quando um monitor encontra passagem abaixo do teto.</string>
+
+    <string name="push_permissao_negada">Permissão de notificação negada. Libere em Configurações › Apps › Flight Monitor › Notificações.</string>
+    <string name="push_sem_firebase">Este aplicativo foi gerado sem a configuração do Firebase (google-services.json), e por isso não recebe push.</string>
+    <string name="push_sem_token">Não foi possível obter o token do Firebase. Verifique a internet e tente de novo.</string>
+</resources>

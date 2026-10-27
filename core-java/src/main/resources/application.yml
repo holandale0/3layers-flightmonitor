@@ -172,10 +172,15 @@ flightmonitor:
     alertar-sem-confirmacao: false
 
   notification:
-    # Canal ativo. LOG ate a etapa E1.12 trazer o WhatsApp — e permanece como
-    # valvula de escape se o WhatsApp cair: melhor alerta visivel no log do que
-    # pendencia acumulando em silencio.
-    canal: ${NOTIFICATION_CHANNEL:LOG}
+    # Canais ativos, separados por virgula: EMAIL,PUSH manda pelos dois ao
+    # mesmo tempo (D-113). Cada destinatario recebe pelos canais que o alcancam.
+    # LOG continua sendo a valvula de escape: melhor alerta visivel no log do
+    # que pendencia acumulando em silencio.
+    #
+    # NOTIFICATION_CHANNEL, no singular, e o nome de antes de haver varios
+    # canais. Segue valendo, para que um .env antigo nao mude de comportamento
+    # sem ninguem mexer nele.
+    canais: ${NOTIFICATION_CHANNELS:${NOTIFICATION_CHANNEL:LOG}}
     # So conta falha TRANSITORIA. Falha permanente (numero invalido, mensagem
     # recusada) vai direto a FAILED, sem gastar tentativa.
     max-tentativas: 3
@@ -216,6 +221,13 @@ flightmonitor:
     enabled: ${CANARIO_ENABLED:false}
     interval: ${CANARIO_INTERVAL:PT24H}
     initial-delay: ${CANARIO_INITIAL_DELAY:PT2M}
+
+  push:
+    # Canal PUSH (D-113): caminho do JSON da conta de servico do Firebase.
+    # Vazio = o canal recusa os envios com falha permanente e mensagem clara, e
+    # o resto do sistema funciona igual. Ver docs/GUIA-PUSH.md.
+    credenciais: ${FCM_CREDENCIAIS:}
+    timeout: PT15S
 
   email:
     # Precisa ser a MESMA conta autenticada em spring.mail.username, ou um alias

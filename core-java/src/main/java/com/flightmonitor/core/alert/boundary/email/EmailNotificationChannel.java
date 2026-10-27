@@ -1,15 +1,12 @@
 package com.flightmonitor.core.alert.boundary.email;
 
+import com.flightmonitor.core.alert.control.AlertMessageFormatter;
 import com.flightmonitor.core.alert.control.DeliveryResult;
 import com.flightmonitor.core.alert.control.NotificationChannel;
 import com.flightmonitor.core.alert.entity.Alert;
 import com.flightmonitor.core.alert.entity.AlertChannel;
-import com.flightmonitor.core.search.entity.PriceObservation;
 
 import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
-import java.text.NumberFormat;
-import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,39 +130,8 @@ public class EmailNotificationChannel implements NotificationChannel {
         return mensagem;
     }
 
-    /**
-     * O assunto, que precisa <b>variar</b> a cada alerta.
-     *
-     * <p>Nao e capricho de redacao: o Gmail agrupa mensagens de assunto identico
-     * na mesma conversa, mesmo vindas de remetente diferente. Com assunto fixo, o
-     * quinto alerta apareceria colapsado dentro de uma thread velha — que e o
-     * oposto do que um monitor precisa fazer. Ver D-098.
-     *
-     * <p>Rota e preco tambem tornam o alerta legivel <b>na propria notificacao do
-     * celular</b>, sem abrir o e-mail. Para um sistema que existe para avisar,
-     * essa e a tela que mais importa.
-     */
+    /** Rota e preco, variando a cada alerta — ver {@link AlertMessageFormatter#titulo}. */
     private String assunto(Alert alerta) {
-        PriceObservation oferta = alerta.getPriceObservation();
-        if (oferta == null) {
-            // Alerta sem observacao nao deveria existir, mas assunto vazio faria
-            // o e-mail parecer spam. Melhor generico do que em branco.
-            return "Oportunidade de passagem encontrada";
-        }
-        return "%s %s %s por %s".formatted(
-                "✈",
-                oferta.getOrigin(),
-                "→ " + oferta.getDestination(),
-                dinheiro(oferta.getPrice(), oferta.getCurrency()));
-    }
-
-    private String dinheiro(BigDecimal valor, String moeda) {
-        if (valor == null) {
-            return "preco indisponivel";
-        }
-        if (!"BRL".equals(moeda)) {
-            return moeda + " " + valor;
-        }
-        return NumberFormat.getCurrencyInstance(Locale.of("pt", "BR")).format(valor);
+        return AlertMessageFormatter.titulo(alerta.getPriceObservation());
     }
 }

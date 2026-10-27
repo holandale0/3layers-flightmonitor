@@ -183,6 +183,8 @@ function escalas(max: number | null | undefined) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  /* No celular o botao desce para baixo do titulo, em vez de espreme-lo. */
+  flex-wrap: wrap;
   margin-bottom: 1.5rem;
 }
 

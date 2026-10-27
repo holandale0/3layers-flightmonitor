@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Recipient } from '@/model/recipient'
-import { alcancavelPor, contatosDe, destinatarioVazio, paraEnvio, paraRequest } from '@/model/recipient'
+import {
+  alcancavelPor,
+  contatosDe,
+  destinatarioVazio,
+  inalcancavel,
+  paraEnvio,
+  paraRequest,
+} from '@/model/recipient'
 
 function destinatario(parcial: Partial<Recipient> = {}): Recipient {
   return {
@@ -12,6 +19,7 @@ function destinatario(parcial: Partial<Recipient> = {}): Recipient {
     active: true,
     createdAt: null,
     updatedAt: null,
+    pushDevices: [],
     ...parcial,
   }
 }
@@ -62,6 +70,34 @@ describe('alcancavelPor', () => {
     // O LOG so imprime: serve qualquer contato que identifique a pessoa.
     expect(alcancavelPor(destinatario({ phoneE164: null }), 'LOG')).toBe(true)
     expect(alcancavelPor(destinatario({ email: null }), 'LOG')).toBe(true)
+  })
+
+  it('push precisa de um aparelho ATIVO', () => {
+    const aparelho = {
+      id: 1, recipientId: 1, name: 'Pixel 8', active: true,
+      lastError: null, createdAt: null, updatedAt: null,
+    }
+    expect(alcancavelPor(destinatario(), 'PUSH')).toBe(false)
+    expect(alcancavelPor(destinatario({ pushDevices: [aparelho] }), 'PUSH')).toBe(true)
+    // Desligado porque o Firebase recusou o token: existe, mas nao recebe.
+    expect(
+      alcancavelPor(destinatario({ pushDevices: [{ ...aparelho, active: false }] }), 'PUSH'),
+    ).toBe(false)
+  })
+})
+
+describe('inalcancavel', () => {
+  it('faltar um canal entre varios nao e problema', () => {
+    // Quem nao tem o app recebe por e-mail: e o normal com varios canais.
+    expect(inalcancavel(destinatario({ phoneE164: null }), ['PUSH', 'EMAIL'])).toBe(false)
+  })
+
+  it('faltar todos e', () => {
+    expect(inalcancavel(destinatario({ email: null }), ['PUSH', 'EMAIL'])).toBe(true)
+  })
+
+  it('sem saber os canais, nao acusa ninguem', () => {
+    expect(inalcancavel(destinatario({ email: null, phoneE164: null }), [])).toBe(false)
   })
 })
 

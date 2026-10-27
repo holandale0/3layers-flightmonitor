@@ -1,15 +1,20 @@
 package com.flightmonitor.core.recipient.control;
 
+import com.flightmonitor.core.recipient.entity.PushDeviceRepository;
 import com.flightmonitor.core.recipient.entity.RecipientRepository;
 import com.flightmonitor.core.recipient.entity.Recipient;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.flightmonitor.core.common.ConflitoException;
 import com.flightmonitor.core.common.NotFoundException;
+import com.flightmonitor.core.recipient.control.dto.PushDeviceResponse;
 import com.flightmonitor.core.recipient.control.dto.RecipientRequest;
 import com.flightmonitor.core.recipient.control.dto.RecipientResponse;
 
@@ -18,9 +23,11 @@ import com.flightmonitor.core.recipient.control.dto.RecipientResponse;
 public class RecipientService {
 
     private final RecipientRepository destinatarios;
+    private final PushDeviceRepository aparelhos;
 
-    public RecipientService(RecipientRepository destinatarios) {
+    public RecipientService(RecipientRepository destinatarios, PushDeviceRepository aparelhos) {
         this.destinatarios = destinatarios;
+        this.aparelhos = aparelhos;
     }
 
     public List<RecipientResponse> listar(Boolean apenasAtivos) {
@@ -28,11 +35,29 @@ public class RecipientService {
                 ? destinatarios.findByActiveTrue()
                 : destinatarios.findAll();
 
-        return encontrados.stream().map(RecipientResponse::de).toList();
+        // Uma consulta para todos os aparelhos, e nao uma por destinatario: a
+        // tela lista todo mundo de uma vez.
+        Map<Long, List<PushDeviceResponse>> porDono = aparelhos.findAll(Sort.by("createdAt", "id"))
+                .stream()
+                .map(PushDeviceResponse::de)
+                .collect(Collectors.groupingBy(PushDeviceResponse::recipientId));
+
+        return encontrados.stream()
+                .map(r -> RecipientResponse.de(r, porDono.getOrDefault(r.getId(), List.of())))
+                .toList();
     }
 
     public RecipientResponse buscar(Long id) {
-        return RecipientResponse.de(buscarEntidade(id));
+        return resposta(buscarEntidade(id));
+    }
+
+    private RecipientResponse resposta(Recipient r) {
+        List<PushDeviceResponse> deste = r.getId() == null
+                ? List.of()
+                : aparelhos.findByRecipientIdOrderByCreatedAtAscIdAsc(r.getId()).stream()
+                        .map(PushDeviceResponse::de)
+                        .toList();
+        return RecipientResponse.de(r, deste);
     }
 
     @Transactional
@@ -41,7 +66,7 @@ public class RecipientService {
 
         Recipient r = new Recipient(req.name(), req.phoneE164(), req.email());
         r.setActive(req.active());
-        return RecipientResponse.de(destinatarios.saveAndFlush(r));
+        return resposta(destinatarios.saveAndFlush(r));
     }
 
     @Transactional
@@ -53,7 +78,7 @@ public class RecipientService {
         r.setPhoneE164(req.phoneE164());
         r.setEmail(req.email());
         r.setActive(req.active());
-        return RecipientResponse.de(destinatarios.saveAndFlush(r));
+        return resposta(destinatarios.saveAndFlush(r));
     }
 
     /**

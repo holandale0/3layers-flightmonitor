@@ -1,6 +1,7 @@
 package com.flightmonitor.core.recipient.control.dto;
 
 import java.time.Instant;
+import java.util.List;
 
 import com.flightmonitor.core.recipient.entity.Recipient;
 
@@ -11,9 +12,11 @@ public record RecipientResponse(
         String email,
         boolean active,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        /** Aparelhos com o aplicativo (D-113): o contato do canal PUSH. */
+        List<PushDeviceResponse> pushDevices) {
 
-    public static RecipientResponse de(Recipient r) {
+    public static RecipientResponse de(Recipient r, List<PushDeviceResponse> aparelhos) {
         return new RecipientResponse(
                 r.getId(),
                 r.getName(),
@@ -21,6 +24,7 @@ public record RecipientResponse(
                 r.getEmail(),
                 r.isActive(),
                 r.getCreatedAt(),
-                r.getUpdatedAt());
+                r.getUpdatedAt(),
+                aparelhos);
     }
 }

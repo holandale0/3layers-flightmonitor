@@ -358,3 +358,46 @@ vencidos. Migrar para uma VPS depois é o mesmo compose e um `.env` diferente.
 [GUIA-DEPLOY.md](GUIA-DEPLOY.md).
 
 **Placar:** core-java **414**, worker-python **116**, frontend-vue **74**.
+
+---
+
+### 2026-10-23 — 🏠 Servidores caseiros, app Android e push · [D-112](DECISOES.md) · [D-113](DECISOES.md)
+
+O projeto mudou de pasta (`C:\Projects\Fullstack\3layers-flightmonitor`, mesmo repositório) e de
+casa: o túnel Cloudflare da E4.4 nunca chegou a ser criado, e o usuário montou dois servidores com
+notebooks antigos — `lab` para dados, `prod` para aplicações.
+
+#### Deploy
+
+- Banco `flightmon` no Postgres 18 do `lab`, criado por um script novo e idempotente do
+  repositório de infraestrutura (`dell-lab/91-banco-da-aplicacao.sh`). A primeira versão parou
+  calada depois do `CREATE ROLE`: o `docker exec -i` engolia o resto do script, que chegava pelo
+  mesmo stdin do `ssh 'bash -s'`.
+- core, worker e painel no `prod`, publicados pelo Funnel em `:10000`. Os dados do PC (6
+  monitores, 7.626 observações, histórico de alertas) migrados; o anti-spam respeitou o
+  histórico na primeira varredura.
+- **O health caiu para DOWN** com tudo funcionando: o indicador do RabbitMQ tentava um broker que
+  não existe no `prod`. Desligado só lá (`MANAGEMENT_HEALTH_RABBIT_ENABLED=false`).
+
+#### Vários canais e push
+
+- `NOTIFICATION_CHANNELS=EMAIL,PUSH`: um alerta por destinatário **e por canal**, só nos canais
+  que alcançam a pessoa. V11 cria `push_device` e aceita `PUSH` em `alert.channel`.
+- Canal PUSH pelo FCM HTTP v1, só com `google-auth-library`. Token morto desliga o aparelho;
+  erro de payload não.
+- **Armadilha evitada:** os E2E forçavam `flightmonitor.notification.canal=LOG` para não mandar
+  mensagem de verdade. Com a propriedade renomeada, passariam a ler `EMAIL` do `.env` e mandar
+  e-mail real a cada `mvn test`. Atualizados junto.
+- **Outra:** `NOTIFICATION_CHANNELS` vazio no compose viraria lista vazia no Spring — e LOG, em
+  silêncio. A cadeia de padrão mora no próprio compose.
+
+#### App
+
+`mobile-android/`, no molde do tour-guide: o painel num WebView, senha do nginx lembrada, ponte
+`window.FlightMonitorApp` para o token de push. Compila com e sem `google-services.json`. O
+painel ganhou breakpoint de celular; conferido com emulação de Pixel 7 em todas as telas, sem
+rolagem horizontal.
+
+**Falta você:** criar o projeto no Firebase e a chave do servidor — [GUIA-PUSH.md](GUIA-PUSH.md).
+
+**Placar:** core-java **312** (antes 287 nesta contagem), frontend-vue **78**.
