@@ -3,25 +3,32 @@ import { computed, onMounted } from 'vue'
 
 import { buscarMonitor } from '@/api/monitores'
 import { listarObservacoes } from '@/api/observacoes'
+import { listarVarreduras } from '@/api/varreduras'
 import GraficoPrecos from '@/components/GraficoPrecos.vue'
 import { useCarregamento } from '@/composables/useCarregamento'
 import { data, dinheiro, duracao, instante } from '@/lib/formato'
 import type { Monitor } from '@/model/monitor'
 import type { Observacao } from '@/model/observacao'
 import { menorPrecoPorData, ondeComprar } from '@/model/observacao'
+import { resumirVarreduras } from '@/model/varredura'
 
 const props = defineProps<{ id: string }>()
 
-// As duas chamadas sao um so estado de tela: nao existe historico sem monitor,
+// As chamadas sao um so estado de tela: nao existe historico sem monitor,
 // e mostrar meia tela enquanto a outra metade carrega so pisca.
 const { dados, carregando, erro, executar } = useCarregamento(async () => {
   const id = Number(props.id)
-  const [monitor, observacoes] = await Promise.all([buscarMonitor(id), listarObservacoes(id)])
-  return { monitor, observacoes }
+  const [monitor, observacoes, varreduras] = await Promise.all([
+    buscarMonitor(id),
+    listarObservacoes(id),
+    listarVarreduras(id),
+  ])
+  return { monitor, observacoes, varreduras }
 })
 
 const monitor = computed<Monitor | null>(() => dados.value?.monitor ?? null)
 const observacoes = computed<Observacao[]>(() => dados.value?.observacoes ?? [])
+const resumo = computed(() => resumirVarreduras(dados.value?.varreduras ?? []))
 
 const porData = computed(() => menorPrecoPorData(observacoes.value))
 
@@ -55,12 +62,40 @@ onMounted(executar)
         </p>
       </header>
 
-      <div v-if="observacoes.length === 0" class="vazio">
-        <p>Nenhuma observação ainda.</p>
+      <div v-if="observacoes.length === 0 && resumo.ciclos === 0" class="vazio">
+        <p>Nenhuma varredura ainda.</p>
         <p class="msg">
           O histórico começa a existir na primeira varredura. Use <strong>Buscar agora</strong>
           na lista de monitores, ou espere o scheduler.
         </p>
+      </div>
+
+      <!-- Buscou e nao achou e diferente de nunca ter buscado: diz qual dos dois -->
+      <div v-else-if="observacoes.length === 0" class="vazio">
+        <p>
+          {{ resumo.ciclos }} varredura(s) sem preço nesta janela, de
+          {{ instante(resumo.primeira) }} a {{ instante(resumo.ultima) }}.
+        </p>
+        <p v-if="resumo.falhas === resumo.ciclos" class="erro">
+          Todas falharam. Último erro: {{ resumo.ultimoErro }}
+        </p>
+        <template v-else>
+          <p class="msg">
+            O sistema está buscando, mas a fonte de preços não tem nenhum para estas datas. Ela
+            guarda só as datas que alguém pesquisou recentemente.
+          </p>
+          <p v-if="resumo.consultasAoVivo > 0" class="msg">
+            A consulta direta ao Google também foi feita {{ resumo.consultasAoVivo }} vez(es),
+            sem achar voo dentro dos critérios.
+          </p>
+          <p v-else class="msg">
+            Para monitor de só ida com janela de até 7 dias, o Google é consultado direto a cada
+            3 horas. Uma janela mais longa, ou de ida e volta, depende só da fonte.
+          </p>
+          <p v-if="resumo.falhas > 0" class="erro">
+            {{ resumo.falhas }} falharam. Último erro: {{ resumo.ultimoErro }}
+          </p>
+        </template>
       </div>
 
       <template v-else>

@@ -298,6 +298,136 @@ class PriceSearchServiceTest {
                 .anySatisfy(o -> assertThat(o.getPrice()).isEqualByComparingTo("5438"));
     }
 
+    // ------------------------------------------- camada 2 como reserva (D-114)
+
+    private CalendarSearchResult varreduraVazia() {
+        return new CalendarSearchResult("GRU", "LIS", List.of(), 0, 0, "SAO", "LIS", List.of());
+    }
+
+    /** Janela de 3 dias: cabe no limite da reserva (7 por padrao). */
+    private void janelaCurta() {
+        monitor.setDepartureWindowEnd(monitor.getDepartureWindowStart().plusDays(2));
+        monitor = monitores.saveAndFlush(monitor);
+    }
+
+    @Test
+    @DisplayName("camada 1 vazia na janela: a camada 2 e consultada dia a dia, sem candidato")
+    void reservaConsultaCadaDia() {
+        janelaCurta();
+        client.varredura = varreduraVazia();
+        client.confirmacao = confirmado("3500");
+
+        SearchOutcome r = service.varrer(monitor);
+
+        assertThat(client.confirmacoesPedidas).hasSize(3);
+        assertThat(client.confirmacoesPedidas).allSatisfy(c -> {
+            assertThat(c.candidatePrice()).isNull();
+            assertThat(c.returnDate()).isNull();
+        });
+        assertThat(client.confirmacoesPedidas).extracting(ConfirmCommand::departureDate)
+                .containsExactly(
+                        monitor.getDepartureWindowStart(),
+                        monitor.getDepartureWindowStart().plusDays(1),
+                        monitor.getDepartureWindowStart().plusDays(2));
+
+        // O historico passa a existir, com o preco real.
+        assertThat(r.observacoesGravadas()).isEqualTo(3);
+        assertThat(observacoes.findAll()).allSatisfy(o -> {
+            assertThat(o.getSource()).isEqualTo(PriceSource.FAST_FLIGHTS);
+            assertThat(o.isConfirmed()).isTrue();
+        });
+        // Acima do teto de 3200: grava, mas nao e oportunidade.
+        assertThat(r.temOportunidade()).isFalse();
+        assertThat(r.avisos()).anyMatch(a -> a.contains("consultou 3 dia(s) direto e achou 3"));
+    }
+
+    @Test
+    @DisplayName("preco da reserva abaixo do teto vira oportunidade ja confirmada, sem reconsultar")
+    void reservaAbaixoDoTeto() {
+        janelaCurta();
+        client.varredura = varreduraVazia();
+        client.confirmacao = confirmado("2950");
+
+        SearchOutcome r = service.varrer(monitor);
+
+        assertThat(r.temOportunidade()).isTrue();
+        assertThat(r.confirmada()).isTrue();
+        assertThat(r.melhorPreco()).isEqualByComparingTo("2950");
+        // So as 3 consultas dos dias: nenhuma confirmacao extra do mesmo preco.
+        assertThat(client.confirmacoesPedidas).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("a reserva nao roda de novo dentro do intervalo")
+    void reservaRespeitaIntervalo() {
+        janelaCurta();
+        client.varredura = varreduraVazia();
+        client.confirmacao = confirmado("3500");
+
+        service.varrer(monitor);
+        client.confirmacoesPedidas.clear();
+        SearchOutcome segunda = service.varrer(monitor);
+
+        assertThat(client.confirmacoesPedidas).isEmpty();
+        assertThat(segunda.avisos()).anyMatch(a -> a.contains("ja foi consultada"));
+    }
+
+    @Test
+    @DisplayName("camada 2 fora do ar na reserva: para no primeiro dia, sem martelar")
+    void reservaParaQuandoDegrada() {
+        janelaCurta();
+        client.varredura = varreduraVazia();
+        client.confirmacao = ConfirmResult.degradado("todas as fontes falharam");
+
+        SearchOutcome r = service.varrer(monitor);
+
+        assertThat(client.confirmacoesPedidas).hasSize(1);
+        assertThat(r.temOportunidade()).isFalse();
+        assertThat(observacoes.findAll()).isEmpty();
+        assertThat(execucoes.findAll()).anySatisfy(e -> {
+            assertThat(e.getSource()).isEqualTo(PriceSource.FAST_FLIGHTS);
+            assertThat(e.getStatus()).isEqualTo(SearchStatus.PARTIAL);
+        });
+    }
+
+    @Test
+    @DisplayName("janela longa demais nao aciona a reserva, e o aviso diz por que")
+    void reservaNaoCobreJanelaLonga() {
+        // A janela padrao deste teste tem 11 dias, acima do limite de 7.
+        client.varredura = varreduraVazia();
+
+        SearchOutcome r = service.varrer(monitor);
+
+        assertThat(client.confirmacoesPedidas).isEmpty();
+        assertThat(r.avisos()).anyMatch(a -> a.contains("longa demais (11 dias)"));
+    }
+
+    @Test
+    @DisplayName("monitor de ida e volta nao aciona a reserva")
+    void reservaSoParaSoIda() {
+        janelaCurta();
+        monitor.setReturnWindowStart(monitor.getDepartureWindowEnd().plusDays(7));
+        monitor.setReturnWindowEnd(monitor.getDepartureWindowEnd().plusDays(10));
+        monitor = monitores.saveAndFlush(monitor);
+        client.varredura = varreduraVazia();
+
+        SearchOutcome r = service.varrer(monitor);
+
+        assertThat(client.confirmacoesPedidas).isEmpty();
+        assertThat(r.avisos()).anyMatch(a -> a.contains("so vale para monitor de so ida"));
+    }
+
+    @Test
+    @DisplayName("com preco da camada 1 na janela, a reserva nao entra")
+    void semReservaQuandoCamada1Responde() {
+        janelaCurta();
+        client.varredura = varreduraCom(oferta("3500", 1));
+
+        service.varrer(monitor);
+
+        assertThat(client.confirmacoesPedidas).isEmpty();
+    }
+
     // ---------------------------------------------------------- execucoes
 
     @Test

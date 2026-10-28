@@ -1901,6 +1901,42 @@ modalidade de alerta direto no app.
 **`NOTIFICATION_CHANNEL`, no singular, segue valendo.** Um `.env` antigo não muda de
 comportamento sem ninguém mexer nele.
 
+### D-114 · A camada 2 como reserva quando a camada 1 não enxerga a janela ✅
+
+**Contexto:** o monitor GRU→BEL, só ida, 01 a 05/12, rodou de hora em hora por um dia inteiro sem
+gravar nada. Toda varredura terminava em SUCCESS com 0 observações. A Travelpayouts tinha 11
+preços para dezembro, **todos a partir de 15/12**. O Google Flights, consultado na mão, tinha voo
+em todos os cinco dias (R$ 891 com escala, R$ 986 direto, batendo com a Decolar).
+
+A regra das duas camadas (D-010) supunha que a camada 1 sempre enxerga o mercado e só
+erra o preço. **Não é verdade**: o cache dela só tem as datas que alguém pesquisou recentemente
+no Aviasales. Fora dele, o monitor não grava histórico e **não alertaria nem com o preço abaixo
+do teto**, porque a camada 2 só era chamada com um candidato da camada 1.
+
+**Decisão:** quando a camada 1 não traz **nenhum** preço dentro da janela, o core consulta a
+camada 2 dia a dia, sem candidato. O que ela acha vai para o histórico como confirmado e passa
+pelas mesmas regras de teto e anti-spam. Como o preço já vem da camada 2, não é confirmado de
+novo.
+
+**Limites, porque cada dia é uma consulta ao vivo ao Google** (`flightmonitor.search.reserva`):
+
+- **Só ida.** Ida e volta multiplicaria as combinações de datas. O aviso da varredura diz isso.
+- **Janela de até 7 dias** (`max-dias`). Mais que isso, a varredura avisa e não consulta.
+- **No máximo uma rodada a cada 3 horas por monitor** (`intervalo`), mesmo com o monitor varrendo
+  de hora em hora. O Google bloqueia quem pergunta demais, e preço de passagem não muda tanto em
+  3 horas. No caso medido, são 5 consultas a cada 3 horas, 40 por dia.
+- **Fonte fora do ar para a rodada** no primeiro dia que falhar, em vez de insistir nos seguintes.
+- **Desligável sem deploy** (`RESERVA_CAMADA2_ENABLED=false`), se o Google começar a bloquear.
+
+**Recusado:** consultar a camada 2 sempre, em vez da camada 1. Seria trocar uma fonte estável e
+gratuita por uma frágil ([FRAGILIDADE-CAMADA-2.md](FRAGILIDADE-CAMADA-2.md)) em todo monitor,
+para resolver o caso em que a estável não tem dado.
+
+**A tela de histórico também mudou.** Com o histórico vazio, ela dizia "use Buscar agora", como
+se o sistema nunca tivesse buscado. Agora mostra quantas varreduras houve, de quando a quando, e
+por que nada foi gravado (`GET /api/monitors/{id}/runs`). "Buscou e não achou" e "nunca buscou"
+são situações opostas, e só uma se resolve buscando de novo.
+
 ## Decisões pendentes
 
 | # | Questão | Quando decidir |

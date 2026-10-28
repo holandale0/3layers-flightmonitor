@@ -401,3 +401,22 @@ rolagem horizontal.
 **Falta você:** criar o projeto no Firebase e a chave do servidor — [GUIA-PUSH.md](GUIA-PUSH.md).
 
 **Placar:** core-java **312** (antes 287 nesta contagem), frontend-vue **78**.
+
+### 2026-10-28 — 🔭 O monitor que buscava sem enxergar · [D-114](DECISOES.md)
+
+O GRU→BEL (só ida, 01 a 05/12, teto R$ 500) rodou de hora em hora por um dia sem gravar nada, e
+a tela de histórico dizia "use Buscar agora", como se ele nunca tivesse buscado.
+
+**Diagnóstico:** o scheduler estava em dia, com todas as varreduras em SUCCESS e 0 observações.
+O log dizia o resto: a Travelpayouts devolvia 11 preços, todos a partir de 15/12. O Google
+Flights, consultado direto pelo worker, tinha voo nos cinco dias (R$ 891 com escala, R$ 986
+direto), e a Decolar confirmou a faixa (R$ 913). **O cache da camada 1 só tem as datas que
+alguém pesquisou**, e fora dele o monitor não alertaria nem com o preço abaixo do teto.
+
+- **Camada 2 como reserva:** sem nenhum preço da camada 1 na janela, o core consulta o Google dia
+  a dia. Só ida, janela de até 7 dias, uma rodada a cada 3 horas por monitor; para no primeiro
+  dia em que a fonte falhar. O preço achado já é confirmado e não é consultado de novo.
+- **Histórico que diz a verdade:** `GET /api/monitors/{id}/runs`, e a tela vazia agora mostra
+  quantas varreduras houve, de quando a quando, e por que nada foi gravado.
+
+**Placar:** core-java **446** (13 só com os serviços no ar), frontend-vue **81**.

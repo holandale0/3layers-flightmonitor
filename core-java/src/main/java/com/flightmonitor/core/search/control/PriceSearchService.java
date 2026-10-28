@@ -9,6 +9,8 @@ import com.flightmonitor.core.search.entity.PriceObservation;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -96,6 +98,10 @@ public class PriceSearchService {
         List<PriceObservation> gravadas = persistirVarredura(monitor, execucao, varredura);
         concluirExecucao(execucao, SearchStatus.SUCCESS, gravadas.size());
 
+        if (gravadas.isEmpty()) {
+            gravadas = consultarReserva(monitor, avisos);
+        }
+
         List<PriceObservation> candidatos = candidatos(monitor, gravadas);
         if (candidatos.isEmpty()) {
             if (varredura.vazioAposFiltro()) {
@@ -107,7 +113,98 @@ public class PriceSearchService {
         log.info("monitor {}: {} observacoes, {} abaixo do teto de {}",
                 monitor.getId(), gravadas.size(), candidatos.size(), monitor.getMaxPrice());
 
+        PriceObservation melhor = candidatos.get(0);
+        if (melhor.isConfirmed()) {
+            // Veio da reserva: o preco ja e da camada 2. Confirmar de novo seria
+            // perguntar ao Google a mesma coisa duas vezes no mesmo segundo.
+            return new SearchOutcome(
+                    monitor.getId(), gravadas.size(), candidatos.size(),
+                    melhor.getId(), melhor.getPrice(),
+                    true, false, false, false, avisos);
+        }
+
         return confirmarMelhorCandidato(monitor, candidatos, gravadas.size(), avisos);
+    }
+
+    // ------------------------------------------------- camada 2 como reserva
+
+    /**
+     * Consulta a camada 2 dia a dia quando a camada 1 nao trouxe nada (D-114).
+     *
+     * <p>A regra das duas camadas supunha que a camada 1 sempre enxerga o
+     * mercado e so erra o preco. Nao e verdade: o cache dela so tem as datas que
+     * alguem pesquisou. Sem esta reserva, uma janela fora do cache nunca gera
+     * historico nem alerta — mesmo com o preco caindo abaixo do teto.
+     *
+     * <p>Os limites existem porque cada dia e uma consulta ao vivo ao Google:
+     * so ida (ida e volta multiplicaria as combinacoes), janela curta, e no
+     * maximo uma rodada a cada {@code intervalo} por monitor.
+     */
+    private List<PriceObservation> consultarReserva(Monitor monitor, List<String> avisos) {
+        SearchProperties.Reserva reserva = props.reserva();
+        if (!reserva.enabled()) {
+            return List.of();
+        }
+
+        if (monitor.getReturnWindowStart() != null || monitor.getMinStayDays() != null) {
+            avisos.add("a camada 1 nao tem preco na janela, e a consulta direta a camada 2"
+                    + " so vale para monitor de so ida");
+            return List.of();
+        }
+
+        LocalDate hoje = LocalDate.now();
+        LocalDate inicio = monitor.getDepartureWindowStart().isBefore(hoje)
+                ? hoje : monitor.getDepartureWindowStart();
+        LocalDate fim = monitor.getDepartureWindowEnd();
+        if (fim.isBefore(inicio)) {
+            return List.of();
+        }
+
+        long dias = ChronoUnit.DAYS.between(inicio, fim) + 1;
+        if (dias > reserva.maxDias()) {
+            avisos.add(("a camada 1 nao tem preco na janela, e ela e longa demais (%d dias)"
+                    + " para consultar a camada 2 dia a dia: o limite e %d")
+                    .formatted(dias, reserva.maxDias()));
+            return List.of();
+        }
+
+        boolean consultadaHaPouco = execucoes.existsByMonitorIdAndSourceAndStartedAtAfter(
+                monitor.getId(), PriceSource.FAST_FLIGHTS, Instant.now().minus(reserva.intervalo()));
+        if (consultadaHaPouco) {
+            avisos.add("a camada 1 nao tem preco na janela; a camada 2 ja foi consultada"
+                    + " ha menos de " + reserva.intervalo().toHours() + "h");
+            return List.of();
+        }
+
+        List<PriceObservation> gravadas = new ArrayList<>();
+        int consultados = 0;
+        for (LocalDate dia = inicio; !dia.isAfter(fim); dia = dia.plusDays(1)) {
+            SearchRun execucao = abrirExecucao(monitor, PriceSource.FAST_FLIGHTS);
+            ConfirmResult resultado = client.confirm(comandoDaReserva(monitor, dia));
+
+            if (resultado.degraded()) {
+                // Fonte fora do ar: insistir nos dias seguintes so somaria
+                // falhas — e pedidos a quem talvez ja esteja nos bloqueando.
+                concluirExecucao(execucao, SearchStatus.PARTIAL, 0);
+                avisos.addAll(resultado.warnings());
+                avisos.add("a camada 2 nao respondeu na consulta direta de " + dia);
+                break;
+            }
+
+            consultados++;
+            if (resultado.naoExiste()) {
+                concluirExecucao(execucao, SearchStatus.SUCCESS, 0);
+            } else {
+                gravadas.add(persistirConfirmacao(monitor, execucao, null, resultado.offer()));
+                concluirExecucao(execucao, SearchStatus.SUCCESS, 1);
+            }
+        }
+
+        avisos.add("a camada 1 nao tem preco na janela; a camada 2 consultou %d dia(s) direto e achou %d preco(s)"
+                .formatted(consultados, gravadas.size()));
+        log.info("monitor {}: reserva da camada 2 gravou {} preco(s) em {} dia(s)",
+                monitor.getId(), gravadas.size(), consultados);
+        return gravadas;
     }
 
     /**
@@ -181,7 +278,7 @@ public class PriceSearchService {
             }
 
             PriceObservation confirmada = persistirConfirmacao(
-                    monitor, execucao, candidato, resultado.offer());
+                    monitor, execucao, candidato.getReturnDate(), resultado.offer());
             concluirExecucao(execucao, SearchStatus.SUCCESS, 1);
 
             boolean aindaCabe = confirmada.getPrice().compareTo(monitor.getMaxPrice()) <= 0;
@@ -219,7 +316,7 @@ public class PriceSearchService {
     }
 
     private PriceObservation persistirConfirmacao(
-            Monitor monitor, SearchRun execucao, PriceObservation candidato, ConfirmedOffer oferta) {
+            Monitor monitor, SearchRun execucao, LocalDate voltaPedida, ConfirmedOffer oferta) {
 
         return tx.execute(status -> {
             PriceObservation o = new PriceObservation(
@@ -232,7 +329,7 @@ public class PriceSearchService {
                     oferta.departureDate(),
                     oferta.price(),
                     PriceSource.FAST_FLIGHTS);
-            o.setReturnDate(oferta.returnDate() != null ? oferta.returnDate() : candidato.getReturnDate());
+            o.setReturnDate(oferta.returnDate() != null ? oferta.returnDate() : voltaPedida);
             o.setCurrency(oferta.currency() != null ? oferta.currency() : monitor.getCurrency());
             o.setAirline(oferta.airline());
             o.setStops(oferta.stops());
@@ -311,6 +408,19 @@ public class PriceSearchService {
                 m.getMaxStops(),
                 m.getPassengers(),
                 candidato.getPrice());
+    }
+
+    /** Consulta de um dia, sem candidato: nao ha preco da camada 1 para comparar. */
+    private ConfirmCommand comandoDaReserva(Monitor m, LocalDate dia) {
+        return new ConfirmCommand(
+                m.getOrigin(),
+                m.getDestination(),
+                dia,
+                null,
+                m.getCurrency(),
+                m.getMaxStops(),
+                m.getPassengers(),
+                null);
     }
 
     /** Candidatos ordenados do mais barato para o mais caro. */

@@ -27,13 +27,28 @@ RabbitMQ e o Postgres do compose base **não sobem** no `prod`: o transporte é 
 
 ## Publicar uma versão nova
 
-A partir da raiz do repositório, neste PC:
+A partir da raiz do repositório, neste PC. **No PowerShell**, o pacote vai como arquivo: o `|`
+do Windows PowerShell 5.1 trata a saída como texto e corrompe o binário — o `prod` responde
+`gzip: stdin: not in gzip format`, e nada é extraído.
+
+```powershell
+tar czf "$env:TEMP\flightmonitor.tgz" --exclude=.git --exclude=node_modules --exclude=target --exclude=dist --exclude=.env --exclude=.venv --exclude=__pycache__ --exclude=images --exclude=diagrams --exclude=mobile-android --exclude=segredos .
+scp "$env:TEMP\flightmonitor.tgz" prod:/tmp/flightmonitor.tgz
+ssh prod 'tar xzf /tmp/flightmonitor.tgz -C /srv/apps/flightmonitor && rm /tmp/flightmonitor.tgz'
+```
+
+O pacote vai para `%TEMP%`, e não para a pasta do projeto, para o `tar` não tentar incluir o
+próprio arquivo. No Git Bash, o pipe direto funciona:
 
 ```bash
 tar czf - --exclude=.git --exclude=node_modules --exclude=target --exclude=dist --exclude=.env \
   --exclude=.venv --exclude=__pycache__ --exclude=images --exclude=diagrams --exclude=mobile-android \
   --exclude=segredos . | ssh prod 'tar xzf - -C /srv/apps/flightmonitor'
+```
 
+Depois, nos dois casos (para mudança só no core e no painel, `build core painel` poupa o worker):
+
+```bash
 ssh prod 'cd /srv/apps/flightmonitor \
   && docker compose -f docker-compose.yml -f docker-compose.prod.yml build \
   && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --wait && sync'

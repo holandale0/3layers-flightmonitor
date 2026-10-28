@@ -11,7 +11,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=flat-square&logo=postgresql)](https://www.postgresql.org)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4-FF6600?style=flat-square&logo=rabbitmq)](https://www.rabbitmq.com)
 [![Docker](https://img.shields.io/badge/Docker_Compose-5_containers-2496ED?style=flat-square&logo=docker)](./docker-compose.yml)
-[![Testes](https://img.shields.io/badge/Testes-620_passando-success?style=flat-square)](#-qualidade)
+[![Testes](https://img.shields.io/badge/Testes-630_passando-success?style=flat-square)](#-qualidade)
 [![License](https://img.shields.io/badge/Licença-MIT-green?style=flat-square)](./LICENSE)
 
 [🎯 Motivação](#-motivação) · [🐳 Subir em 2 minutos](#-como-rodar-o-projeto) · [📐 Diagramas interativos](./diagrams/) · [📚 Documentação](#-documentação)
@@ -205,6 +205,12 @@ Essa mesma disciplina aparece na entrega: `ACCEPTED` (a Meta recebeu) e `DELIVER
 
 Repare no último passo do diagrama: o preço confirmado **ainda pode não virar alerta**. Teto, anti-spam e análise decidem depois.
 
+**Quando a camada 1 não enxerga a janela**, a camada 2 entra como reserva. O cache da
+Travelpayouts só tem as datas que alguém pesquisou recentemente, e sem a reserva um monitor
+nessas datas buscaria para sempre sem gravar nada. Para monitor de só ida com janela de até 7
+dias, o Google é consultado direto, dia a dia, no máximo a cada 3 horas
+([D-114](docs/DECISOES.md)).
+
 ### Ciclo de vida do alerta
 
 ![Ciclo de vida do alerta](diagrams/alerta.svg)
@@ -350,12 +356,12 @@ python scripts/extrai_svg_dos_diagramas.py
 ## 🧪 Qualidade
 
 ```bash
-cd core-java     && ./mvnw test     # 439 (13 só rodam com os serviços no ar)
+cd core-java     && ./mvnw test     # 446 (13 só rodam com os serviços no ar)
 cd worker-python && pytest          # 116
-cd frontend-vue  && npm test        # 78
+cd frontend-vue  && npm test        # 81
 ```
 
-**620 testes passando**, e nenhum deles manda e-mail, mensagem de WhatsApp, push ou requisição a API paga. O SMTP é falso (GreenMail), o Firebase e as fontes externas têm dublês, e a suíte do Java usa o banco `flightmon_test` — **rodar os testes não apaga o que você cadastrou**.
+**630 testes passando**, e nenhum deles manda e-mail, mensagem de WhatsApp, push ou requisição a API paga. O SMTP é falso (GreenMail), o Firebase e as fontes externas têm dublês, e a suíte do Java usa o banco `flightmon_test` — **rodar os testes não apaga o que você cadastrou**.
 
 ### Arquitetura verificada, não documentada
 
@@ -379,7 +385,7 @@ Este projeto documenta o **porquê**, e não só o quê. Se algo parecer uma esc
 |---------|----------|
 | [docs/PLANO-DE-ACAO.md](docs/PLANO-DE-ACAO.md) | Escopo, arquitetura e o roteiro etapa a etapa |
 | [docs/PROGRESSO.md](docs/PROGRESSO.md) | Diário de bordo — o que foi feito, como foi testado, e o que deu errado |
-| [docs/DECISOES.md](docs/DECISOES.md) | 113 decisões e por que as alternativas foram descartadas |
+| [docs/DECISOES.md](docs/DECISOES.md) | 114 decisões e por que as alternativas foram descartadas |
 | [docs/BUGS.md](docs/BUGS.md) | Bugs com diagnóstico e lição, e riscos em observação |
 | [docs/FRAGILIDADE-CAMADA-2.md](docs/FRAGILIDADE-CAMADA-2.md) | Por que a camada 2 vai quebrar, e o plano para quando quebrar |
 | [docs/GUIA-EMAIL.md](docs/GUIA-EMAIL.md) | Canal de e-mail — o caminho mais rápido para receber alertas |

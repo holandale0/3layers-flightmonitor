@@ -105,6 +105,13 @@ flightmonitor:
     # por excesso de requisicoes. O alerta trata da melhor oportunidade, entao
     # confirmar a mais barata basta.
     max-confirmacoes: 1
+    # Camada 2 como reserva (D-114): quando a camada 1 nao tem NENHUM preco na
+    # janela, o Google e consultado direto, dia a dia. So para monitor de so
+    # ida, janela curta, e no maximo uma vez a cada `intervalo` por monitor.
+    reserva:
+      enabled: ${RESERVA_CAMADA2_ENABLED:true}
+      max-dias: 7
+      intervalo: PT3H
 
   scheduler:
     enabled: ${SCHEDULER_ENABLED:true}

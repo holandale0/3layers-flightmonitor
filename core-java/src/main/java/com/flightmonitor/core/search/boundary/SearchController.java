@@ -1,6 +1,8 @@
 package com.flightmonitor.core.search.boundary;
 
 import com.flightmonitor.core.search.control.ObservationResponse;
+import com.flightmonitor.core.search.control.SearchRunResponse;
+import com.flightmonitor.core.search.entity.SearchRunRepository;
 
 import com.flightmonitor.core.search.entity.PriceObservationRepository;
 import com.flightmonitor.core.search.control.SearchCycleService;
@@ -33,14 +35,17 @@ public class SearchController {
     private final SearchCycleService ciclo;
     private final PriceObservationRepository observacoes;
     private final MonitorRepository monitores;
+    private final SearchRunRepository execucoes;
 
     public SearchController(
             SearchCycleService ciclo,
             PriceObservationRepository observacoes,
-            MonitorRepository monitores) {
+            MonitorRepository monitores,
+            SearchRunRepository execucoes) {
         this.ciclo = ciclo;
         this.observacoes = observacoes;
         this.monitores = monitores;
+        this.execucoes = execucoes;
     }
 
     /**
@@ -71,6 +76,23 @@ public class SearchController {
                 .findByMonitorIdOrderByObservedAtDescIdDesc(id, PageRequest.of(0, Math.min(limit, 500)))
                 .stream()
                 .map(ObservationResponse::de)
+                .toList();
+    }
+
+    /** As varreduras mais recentes, das duas camadas, da mais nova para a mais antiga. */
+    @GetMapping("/runs")
+    public List<SearchRunResponse> varreduras(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "50") int limit) {
+
+        if (!monitores.existsById(id)) {
+            throw new NotFoundException("Monitor", id);
+        }
+
+        return execucoes
+                .findByMonitorIdOrderByStartedAtDescIdDesc(id, PageRequest.of(0, Math.clamp(limit, 1, 500)))
+                .stream()
+                .map(SearchRunResponse::de)
                 .toList();
     }
 }

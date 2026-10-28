@@ -12,4 +12,7 @@ public interface SearchRunRepository extends JpaRepository<SearchRun, Long> {
 
     /** Taxa de falha por fonte de preco — diagnostico de provider degradado. */
     long countBySourceAndStatusAndStartedAtAfter(PriceSource source, SearchStatus status, Instant desde);
+
+    /** A camada 2 ja foi consultada para este monitor desde `desde`? Limita a reserva (D-114). */
+    boolean existsByMonitorIdAndSourceAndStartedAtAfter(Long monitorId, PriceSource source, Instant desde);
 }
